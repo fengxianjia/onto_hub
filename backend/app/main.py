@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query, Request, BackgroundTasks
+from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query, Request, BackgroundTasks, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -50,18 +50,69 @@ def get_ontology_service(
     return OntologyService(onto_repo, webhook_repo, webhook_service)
 
 @app.post("/api/ontologies", response_model=schemas.OntologyPackageResponse, status_code=201)
-async def upload_ontology(
+async def create_ontology_series(
     background_tasks: BackgroundTasks,
+    code: str = Form(..., description="本体唯一编码 (Series ID)"),
+    name: str = Form(None, description="显示名称"),
+    custom_id: str = Form(None, description="自定义版本ID (Optional)"),
     file: UploadFile = File(..., description="本体 ZIP 包"),
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
 ):
-    package = await service.create_ontology(file)
+    # Check if code exists (for V1 creation, we might want to enforce uniqueness or just allow overwrite if version 0?)
+    # For now, let's assume this endpoint is for "New Series" or "Idempotent Creation of V1".
+    # But wait, if code exists, create_ontology will just add V(Max+1). 
+    # The requirement is: 
+    # 1. Create New Ontology: Input Code -> V1. If Code exists, Error?
+    # 2. Add Version: Input Code (Select) -> V(Next).
+    
+    # Check if series exists
+    existing_version = service.onto_repo.get_latest_version(code)
+    if existing_version > 0:
+         raise HTTPException(status_code=400, detail=f"Ontology code '{code}' already exists. Use POST /api/ontologies/{code}/versions to add a new version.")
+
+    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=name)
     
     # Broadcast Webhook
+    _broadcast_activation(package, service, webhook_service, background_tasks)
+        
+    return package
+
+@app.post("/api/ontologies/{code}/versions", response_model=schemas.OntologyPackageResponse, status_code=201)
+async def add_ontology_version(
+    code: str,
+    background_tasks: BackgroundTasks,
+    custom_id: str = Form(None, description="自定义版本ID (Optional)"),
+    file: UploadFile = File(..., description="本体 ZIP 包"),
+    service: OntologyService = Depends(get_ontology_service),
+    webhook_service: WebhookService = Depends(get_webhook_service)
+):
+    # Check if series exists
+    existing_version = service.onto_repo.get_latest_version(code)
+    if existing_version == 0:
+         raise HTTPException(status_code=404, detail=f"Ontology code '{code}' not found. Use POST /api/ontologies to create it first.")
+    
+    # Inherit name from latest version if not provided? 
+    # Service uses file.filename as fallback for name if name is None.
+    # We should probably get the name from the previous version to keep it consistent?
+    # Let's get the active package or latest package to copy the name.
+    # For now, let service handle it (it uses filename).
+    # Ideally, we should pass the existing name.
+    
+    # Get latest package to reuse name?
+    # The service.create_ontology allows name=None.
+    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=None)
+    
+    # Broadcast Webhook
+    _broadcast_activation(package, service, webhook_service, background_tasks)
+        
+    return package
+
+def _broadcast_activation(package, service, webhook_service, background_tasks):
     payload = {
         "event": "ontology.activated",
         "package_id": package.id,
+        "code": package.code,
         "name": package.name,
         "version": package.version,
         "is_active": True,
@@ -69,18 +120,13 @@ async def upload_ontology(
         "timestamp": datetime.utcnow().isoformat()
     }
     
-    # Files are extracted in OntologyService, we point to the directory for the ZIP broadcast?
-    # Original logic sent the source ZIP if possible.
-    # We'll maintain the path logic.
     webhook_service.broadcast_event(
         event_type="ontology.activated",
         payload=payload,
-        ontology_name=package.name,
+        ontology_name=package.name, # TODO: Filter by Code?
         background_tasks=background_tasks,
         file_path=service.get_source_zip_path(package.id)
     )
-        
-    return package
 
 @app.post("/api/webhooks", response_model=schemas.WebhookResponse, status_code=201)
 def create_webhook(
@@ -134,10 +180,11 @@ def get_ontologies(
     skip: int = 0, 
     limit: int = 100, 
     name: str = None,
+    code: str = None,
     all_versions: bool = False,
     service: OntologyService = Depends(get_ontology_service)
 ):
-    return service.list_ontologies(skip, limit, name, all_versions)
+    return service.list_ontologies(skip, limit, name, code, all_versions)
 
 @app.post("/api/ontologies/{id}/activate")
 def activate_ontology(
@@ -167,36 +214,21 @@ def activate_ontology(
         
     return {"status": "activated", "version": package.version}
 
+@app.get("/api/ontologies/compare", response_model=schemas.OntologyComparisonResponse)
+async def compare_ontologies(
+    base_id: str = Query(..., description="基准版本ID"),
+    target_id: str = Query(..., description="目标版本ID"),
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """比较两个本体版本之间的差异"""
+    return await service.compare_packages(base_id, target_id)
+
 @app.get("/api/ontologies/{id}", response_model=schemas.OntologyPackageDetailResponse)
 def get_ontology_detail(
     id: str,
     service: OntologyService = Depends(get_ontology_service)
 ):
     return service.get_ontology_detail(id)
-
-@app.delete("/api/ontologies/{id}", status_code=204)
-def delete_ontology(
-    id: str,
-    service: OntologyService = Depends(get_ontology_service)
-):
-    service.delete_ontology(id)
-    return None
-
-@app.get("/api/logs/ontologies")
-def get_ontology_logs(
-    name: str = Query(..., description="本体名称"),
-    skip: int = 0,
-    limit: int = 50,
-    service: WebhookService = Depends(get_webhook_service)
-):
-    return service.get_logs_by_ontology(name, skip, limit)
-
-@app.get("/api/subscriptions/ontologies/status")
-def get_subscription_status(
-    name: str = Query(..., description="本体名称"),
-    service: WebhookService = Depends(get_webhook_service)
-):
-    return service.get_subscription_status(name)
 
 @app.get("/api/ontologies/{id}/deliveries")
 def get_ontology_deliveries(

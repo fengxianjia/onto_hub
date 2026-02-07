@@ -16,6 +16,7 @@ class OntologyFileResponse(OntologyFileBase):
 
 class OntologyPackageBase(BaseModel):
     name: str
+    code: Optional[str] = None
     version: int = 1
     is_active: bool = False
 
@@ -74,3 +75,14 @@ class WebhookDeliveryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class FileDiff(BaseModel):
+    file_path: str
+    status: str # "added", "deleted", "modified", "unchanged"
+    base_content: Optional[str] = None
+    target_content: Optional[str] = None
+
+class OntologyComparisonResponse(BaseModel):
+    base_version: int
+    target_version: int
+    files: List[FileDiff]

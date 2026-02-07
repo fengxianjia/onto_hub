@@ -7,9 +7,11 @@ class OntologyRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_package(self, name: str, version: int, description: str = None) -> models.OntologyPackage:
+    def create_package(self, name: str, version: int, code: str = None, description: str = None, id: str = None) -> models.OntologyPackage:
         db_package = models.OntologyPackage(
+            id=id, # Allow custom ID
             name=name,
+            code=code,
             version=version,
             description=description,
             status="READY"
@@ -28,16 +30,22 @@ class OntologyRepository:
             models.OntologyPackage.is_active == True
         ).first()
 
-    def get_latest_version(self, name: str) -> int:
-        latest = self.db.query(models.OntologyPackage).filter(
-            models.OntologyPackage.name == name
-        ).order_by(models.OntologyPackage.version.desc()).first()
+    def get_latest_version(self, code: str) -> int:
+        # Use code to find the latest version
+        latest = self.get_latest_package_by_code(code)
         return latest.version if latest else 0
 
-    def list_packages(self, skip: int = 0, limit: int = 100, name: str = None, all_versions: bool = False) -> List[models.OntologyPackage]:
+    def get_latest_package_by_code(self, code: str) -> Optional[models.OntologyPackage]:
+        return self.db.query(models.OntologyPackage).filter(
+            models.OntologyPackage.code == code
+        ).order_by(models.OntologyPackage.version.desc()).first()
+
+    def list_packages(self, skip: int = 0, limit: int = 100, name: str = None, code: str = None, all_versions: bool = False) -> List[models.OntologyPackage]:
         query = self.db.query(models.OntologyPackage)
         if name:
-            query = query.filter(models.OntologyPackage.name == name)
+            query = query.filter(models.OntologyPackage.name.contains(name)) # Fuzzy search for name
+        if code:
+            query = query.filter(models.OntologyPackage.code == code)
         
         if not all_versions:
             # Only active versions or the most recent ones if no active exists? 
@@ -53,10 +61,10 @@ class OntologyRepository:
             self.db.delete(package)
             self.db.commit()
 
-    def set_active_version(self, name: str, package_id: str):
-        # 1. 停用该名称下的所有历史版本
+    def set_active_version(self, code: str, package_id: str):
+        # 1. 停用该 Code 下的所有历史版本
         self.db.query(models.OntologyPackage).filter(
-            models.OntologyPackage.name == name
+            models.OntologyPackage.code == code
         ).update({"is_active": False}, synchronize_session="fetch")
         
         # 2. 激活指定版本

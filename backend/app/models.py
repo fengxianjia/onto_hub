@@ -17,7 +17,8 @@ class OntologyPackage(Base):
     __tablename__ = "ontology_packages"
 
     id = Column(String, primary_key=True, default=generate_uuid, index=True)
-    name = Column(String, index=True, comment="本体名称")
+    code = Column(String, index=True, nullable=True, comment="本体唯一编码 (Series ID)")
+    name = Column(String, index=True, comment="本体显示名称")
     description = Column(Text, nullable=True, comment="描述")
     upload_time = Column(DateTime, default=datetime.utcnow, comment="上传时间")
     status = Column(String, default="UPLOADING", comment="状态: UPLOADING, PROCESSING, READY, ERROR")

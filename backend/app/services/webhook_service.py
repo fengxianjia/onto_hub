@@ -38,12 +38,41 @@ class WebhookService:
             results.append(d_dict)
         return results
 
-    def get_subscription_status(self, name: str) -> List[dict]:
+    def get_subscription_status(self, name: str = None, code: str = None) -> List[dict]:
         # Logic from manager.py moved here
-        webhooks = self.repo.get_webhooks_by_event("ontology.activated", ontology_name=name)
+        # We fetch all "ontology.activated" webhooks and then filter in memory or via repo
+        # Repo get_webhooks_by_event currently takes 'ontology_name'. 
+        # We should probably fetch all and filter, OR update repo.
+        # For now, let's fetch all related to the event.
+        # If repo filters by name strictly, we might miss code-based ones if parameters mismatch.
+        # Let's assume repo.get_webhooks_by_event handles optional filtering or we pass None to get all global ones + we manually filter?
+        # Actually proper way:
+        target_name = name
+        target_code = code
+
+        # Fetch webhooks that match EITHER name OR code (or Global)
+        webhooks = self.repo.get_webhooks_by_event(
+            "ontology.activated", 
+            ontology_name=target_name, 
+            ontology_code=target_code
+        )
+        
         results = []
         for wh in webhooks:
-            latest_success = self.repo.get_latest_success_delivery(wh.id, name)
+            # Check latest delivery for this specific ontology version
+            # We need to check against both target_name and target_code because 
+            # delivery logs might have been saved under either ONE of them 
+            # depending on what was available at delivery time.
+            # But get_latest_success_delivery takes a single ontology_name arg.
+            # Let's check both possibilities.
+            
+            latest_success = None
+            if target_code:
+                 latest_success = self.repo.get_latest_success_delivery(wh.id, target_code)
+            
+            if not latest_success and target_name:
+                 latest_success = self.repo.get_latest_success_delivery(wh.id, target_name)
+
             version = None
             delivered_at = None
             if latest_success:

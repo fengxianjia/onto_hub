@@ -13,6 +13,7 @@
     "element-plus": "^2.13.2",
     "github-markdown-css": "^5.9.0",
     "markdown-it": "^14.1.0",
+    "v-code-diff": "^1.13.1",
     "vue": "^3.5.24"
   },
   "devDependencies": {

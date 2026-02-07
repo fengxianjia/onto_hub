@@ -39,7 +39,7 @@ print(content)
 
 ### 支持的事件
 
-*   `ontology.uploaded`: 当 ZIP 包上传解压完成并存入数据库后触发。
+*   `ontology.activated`: 当新版本本体被启用 (Active) 时触发。
 
 ### 使用示例
 
@@ -58,7 +58,7 @@ def on_ontology_uploaded(payload):
     # task_queue.push(payload['package_id'])
 
 # 注册回调
-OntologySDK.subscribe("ontology.uploaded", on_ontology_uploaded)
+OntologySDK.subscribe("ontology.activated", on_ontology_activated)
 ```
 
 ## 架构说明
@@ -86,9 +86,13 @@ from client import OntologyClient
 # 初始化 Client，指向本体管理服务的地址
 client = OntologyClient("http://ontology-service:8000")
 
-# 1. 上传
-result = client.upload_ontology("./my_ontology.zip")
-print(f"Uploaded ID: {result['id']}")
+# 1. 创建新本体系列
+result = client.upload_ontology("./my_ontology.zip", code="auth-module", name="认证模块")
+print(f"Created Series: {result['code']} v{result['version']}")
+
+# 2. 上传新版本
+result = client.upload_ontology("./my_ontology_v2.zip", code="auth-module")
+print(f"Added Version: {result['code']} v{result['version']}")
 
 # 2. 读取文件
 content = client.get_file_content(result['id'], "summary.md")
@@ -125,12 +129,13 @@ async def on_ontology_event(
     file: UploadFile = File(...) # 原始 ZIP 文件
 ):
     data = json.loads(payload)
-    print(f"收到事件: {data['event']}")
-    print(f"新本体ID: {data['package_id']}")
+    # Payload contains: code, name, version, package_id etc.
+    print(f"本体Code: {data['code']}")
+    print(f"版本: {data['version']}")
     
     # 保存或处理 ZIP 文件
     content = await file.read()
-    with open(f"received_{data['package_id']}.zip", "wb") as f:
+    with open(f"received_{data['code']}_v{data['version']}.zip", "wb") as f:
         f.write(content)
         
     # 触发您的后续处理逻辑...

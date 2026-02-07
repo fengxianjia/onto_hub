@@ -1,145 +1,136 @@
-# 本体管理模块详细设计与架构审计
+# OntoHub 系统架构设计文档
 
-## 1. 现状回顾
-原设计仅包含简要的功能点：查看、上传（Zip包包含MD）、删除。需补充具体的架构细节、安全措施及接口定义。
+## 1. 系统概述 (Overview)
+OntoHub 是一个企业级本体管理系统，核心目标是提供安全、版本化、可观测的本体模型分发服务。系统采用前后端分离架构，后端基于 FastAPI + SQLite，前端基于 Vue 3 + Element Plus。
 
 ## 2. 系统架构 (System Architecture)
 
-本模块作为独立服务或子模块运行，负责本体文件的生命周期管理。
-**技术栈**: Python 3.10+, **FastAPI**, **SQLite**
-
-### 架构图 (Mermaid)
+### 2.1 分层架构 (Layered Architecture)
+系统严格遵循 **Controller-Service-Repository** 分层模式，确保关注点分离。
 
 ```mermaid
 graph TB
-    Client["Web前端 / 外部系统"]
+    Client["Web Front / External System"]
     
-    subgraph "Ontology Management Data Flow"
-        API_Layer["API 接口层 (FastAPI)"]
-        Logic_Layer["业务逻辑层"]
-        Storage_Layer["存储层"]
+    subgraph "API Layer (Routers)"
+        Auth["Authentication (Optional)"]
+        OntoRouter["Ontology Router"]
+        WebhookRouter["Webhook Router"]
     end
 
-    Client -- "1. Upload (.zip)" --> API_Layer
-    Client -- "2. List/View" --> API_Layer
+    subgraph "Service Layer (Business Logic)"
+        OntoService["OntologyService (Versioning, File Ops)"]
+        WebhookService["WebhookService (Dispatch, Logs)"]
+        EventBus["Event Bus (Internal)"]
+    end
+
+    subgraph "Data Layer (Repositories)"
+        OntoRepo["OntologyRepository"]
+        WebhookRepo["WebhookRepository"]
+    end
+
+    subgraph "Storage"
+        DB[("SQLite Database")]
+        FileSys["Local File System"]
+    end
+
+    Client --> OntoRouter
+    Client --> WebhookRouter
     
-    API_Layer -- "Validate" --> Logic_Layer
-    Logic_Layer -- "Security Check (Zip Slip)" --> Logic_Layer
-    Logic_Layer -- "Extract & Parse" --> Logic_Layer
+    OntoRouter --> OntoService
+    WebhookRouter --> WebhookService
     
-    Logic_Layer -- "Save Metadata" --> Storage_Layer
-    Logic_Layer -- "Save Files" --> Storage_Layer
+    OntoService -- "CRUD" --> OntoRepo
+    OntoService -- "File Ops" --> FileSys
+    OntoService -- "Emit Event" --> EventBus
     
-    Database[("Metadata DB: SQLite")]
-    FileSystem["File Object Store (Local Disk)"]
+    WebhookService -- "Listen Event" --> EventBus
+    WebhookService -- "CRUD" --> WebhookRepo
     
-    Storage_Layer -- "Relational Data" --> Database
-    Storage_Layer -- "Raw .md Files" --> FileSystem
+    OntoRepo --> DB
+    WebhookRepo --> DB
 ```
 
-## 3. 安全性审计 (Security Audit)
+### 2.2 核心模块说明
+1.  **OntologyService**: 
+    *   处理 ZIP 上传、解压、安全扫描。
+    *   **版本控制**: 自动计算新版本号，管理 Active/Deprecated 状态。
+    *   **删除保护**: 检查版本是否被 Webhook 订阅锁定。
+2.  **WebhookService**:
+    *   管理订阅者信息 (URL, Secret, Filter)。
+    *   **异步分发**: 监听内部事件，使用 `BackgroundTasks` 或 `asyncio` 并发推送。
+    *   **Payload 封装**: 组装 `multipart/form-data` (JSON Metadata + ZIP File)。
 
-| 风险类别 (Risk Category) | 潜在威胁 (Threat) | 缓解措施 (Mitigation) |
+---
+
+## 3. 关键特性设计 (Key Features)
+
+### 3.1 版本控制模型 (Versioning Model)
+系统采用 **系列 (Series) + 版本 (Version)** 的管理模式。
+
+*   **唯一标识 (Series ID)**: 每个本体系列由唯一的 `code` (e.g., `auth-module`) 标识。
+*   **唯一约束**: `(code, version)` 联合唯一。即使 `name` 发生变更，只要 `code` 相同，仍属于同一系列。
+*   **状态机**:
+    *   `READY`: 上传成功，等待启用。
+    *   `ACTIVE`: 当前生效的主版本 (同一 `name` 只能有一个 Active 版本)。
+    *   `DEPRECATED`: 历史版本，可读但不可变更。
+*   **API 行为**:
+    *   `GET /api/ontologies`: 默认只返回 `is_active=True` 的版本（最新版）。
+    *   `GET /api/ontologies?all_versions=true`: 返回所有历史版本。
+
+### 3.2 不可变基础设施与删除约束 (Deletion Constraints)
+为了保障下游系统的稳定性，系统实施了严格的**删除保护策略**：
+
+1.  **Active Lock**: 正在被标记为 `Active` 的版本**禁止删除**。必须先激活其他版本（或无 Active 版本）才能删除。
+2.  **Usage Lock**: 如果某个版本已经被 Webhook 成功推送给订阅者，且订阅者尚未更新到更新的版本，则该版本被视为**“正在使用中”**，禁止删除。
+
+### 3.3 事件驱动分发 (Event-Driven Delivery)
+*   **触发时机**: 当管理员调用 `POST /api/ontologies/{id}/activate` 接口时。
+*   **事件名**: `ontology.activated` (替代旧的 `uploaded`)。
+*   **Payload 结构 (Multipart)**:
+    *   `payload`: JSON 字符串，包含 `id`, `name`, `version`, `description`, `upload_time`。
+    *   `file`: 原始 ZIP 文件流。
+*   **安全性**: 
+    *   支持 `X-Hub-Signature` (HMAC-SHA256) 签名校验（Todo）。
+
+---
+
+## 4. 数据模型 (Data Design)
+
+### 4.1 OntologyPackage
+| 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| **恶意文件上传 (Malicious Upload)** | **Zip Slip 漏洞**: 恶意构造的 ZIP 包包含 `../../` 路径，解压时覆盖服务器关键文件。 | **强制与关键**: 解压时严格检查每个 Entry 的目标路径，确保其解析后位于目标解压目录之下。 |
-| **拒绝服务 (DoS)** | **Zip Bomb (Decompression Bomb)**: 高压缩比的小文件解压后膨胀为巨型文件，耗尽磁盘或内存。 | 限制上传文件大小 (e.g., 50MB)；限制解压后的文件总大小与文件数量。 |
-| **注入攻击 (Injection)** | **Filename Injection**: 文件名包含特殊字符干扰文件系统操作。 | 对上传文件名和解压内部文件名进行净化 (Sanitization)，仅保留安全字符。 |
-| **XSS 攻击** | **Markdown XSS**: MD 文件中嵌入恶意 `<script>` 标签。 | 仅存储原始内容。前端渲染时必须使用 DOMPurify 或类似库进行清洗。接口层可添加 Content-Security-Policy 头。 |
-| **越权访问 (Path Traversal)** | **Read Arbitrary Files**: 读取接口通过 `../../` 读取系统文件。 | 读取接口严格校验 `file_path` 参数，禁止包含父目录跳转符。 |
+| `id` | UUID | 全局唯一标识 |
+| `code` | String | 本体唯一编码 (Series ID) |
+| `name` | String | 本体显示名称 |
+| `version` | Integer | 版本号 (1, 2, 3...) |
+| `is_active` | Boolean | 是否为当前启用版本 |
+| `status` | String | READY, PROCESSING, ERROR |
+| `file_count` | Integer | 包内文件数量 |
 
-## 4. 详细设计 (Detailed Design)
+### 4.2 Webhook
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | UUID | 唯一标识 |
+| `target_url` | String | 接收端 URL |
+| `event_type` | String | 监听事件 (default: `ontology.activated`) |
+| `ontology_filter` | String | (可选) 仅监听特定 **Code 或 Name** 的本体 |
+| `secret_token` | String | (可选) 用于签名的密钥 |
 
-### 4.1 存储架构说明 (Storage vs Database)
+### 4.3 WebhookDelivery
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `webhook_id` | UUID | 关联的订阅者 |
+| `package_id` | UUID | 关联的本体包版本 |
+| `status` | String | SUCCESS, FAILED |
+| `response_status` | Integer | HTTP 状态码 |
+| `error_message` | String | 错误详情 |
 
-为了保持高效和灵活性，系统采用 **"元数据与实体分离"** 的存储策略：
+---
 
-1.  **数据库 (Database - SQLite)**:
-    *   **存储内容**: 存储 "关于数据的数据" (Metadata)。例如：本体包的名称、上传者、上传时间、包含哪些文件、每个文件的层级结构、解析状态等。
-    *   **作用**: 支持快速查询列表、搜索、管理状态。避免每次为了列出文件都要去扫描磁盘。
-    *   **文件**: `ontology.db`
+## 5. 安全性设计 (Security)
 
-2.  **文件存储 (File Storage - Local Disk)**:
-    *   **存储内容**: 存储 **实际的物理文件** (Raw Data)。即 ZIP 包解压后的 `.md` 文档本身。
-    *   **作用**: 当用户需要阅读文档的具体内容时，系统根据数据库指引找到磁盘上的这个文件并读取内容。
-    *   **位置**: `/data/ontology_storage/{uuid}/`
-
-**关系**:
-*   数据库中的 `ontology_file` 表记录了一个字段 `file_path` (例如 `concepts/user.md`)。
-*   系统在读取时，将 `根目录` + `本体包ID目录` + `file_path` 拼接成完整的物理路径，读取磁盘内容。
-
-### 4.2 数据模型 (Data Model - SQLite)
-
-使用 SQLAlchemy 或 SQLModel 和 SQLite 存储元数据。
-
-**Table: `ontology_package` (本体包)**
-*   `id` (String/UUID): 主键，唯一标识
-*   `name` (String): 本体名称 (通常为上传的文件名)
-*   `description` (Text): 描述 (可选)
-*   `upload_time` (Datetime): 上传时间
-*   `status` (Enum): `UPLOADING`, `PROCESSING`, `READY`, `ERROR`
-*   `error_msg` (Text): 错误信息 (如有)
-
-**Table: `ontology_file` (本体文件)**
-*   `id` (String/UUID): 主键
-*   `package_id` (String/UUID): 外键 -> `ontology_package.id`
-*   `file_path` (String): 在 ZIP 包内的相对路径 (e.g., `concepts/user.md`)
-*   `file_size` (Integer): 文件大小
-*   `content_preview` (Text): 内容摘要 (可选，用于快速预览)
-
-### 4.3 接口定义 (API Interface - FastAPI)
-
-遵循 RESTful 风格，使用 Pydantic 模型进行校验。
-
-1.  **上传本体**
-    *   **Method**: `POST /api/ontologies`
-    *   **Input**: `file` (UploadFile, application/zip)
-    *   **Process**:
-        1.  FastAPI `UploadFile` 接收流。
-        2.  生成 ID，保存临时文件。
-        3.  解压并进行安全性扫描 (Zip Slip, Zip Bomb)。
-        4.  提取 `.md` 文件，存入文件存储目录。
-        5.  写入 SQLite 元数据。
-    *   **Output**: JSON `{ "id": "uuid", "status": "processing" }`
-
-2.  **获取本体列表**
-    *   **Method**: `GET /api/ontologies`
-    *   **Output**: List of `OntologyPackageSchema`
-
-3.  **获取本体详情**
-    *   **Method**: `GET /api/ontologies/{id}`
-    *   **Output**: `OntologyPackageDetailSchema` (包含文件树)
-
-4.  **读取文件内容**
-    *   **Method**: `GET /api/ontologies/{id}/files`
-    *   **Query Param**: `path` (relative path)
-    *   **Output**: Pure Markdown String
-
-5.  **删除本体**
-    *   **Method**: `DELETE /api/ontologies/{id}`
-    *   **Process**: 事务性删除 SQLite 记录及磁盘目录。
-    
-6.  **Webhook 管理 & 投递 (New)**
-    *   **注册/管理**: `POST/GET/DELETE /api/webhooks`
-    *   **查看日志**: `GET /api/webhooks/{id}/logs` 或 `GET /api/ontologies/{id}/deliveries`
-    *   **投递机制**: 
-        *   使用 Python `BackgroundTasks` 异步投递。
-        *   Payload 格式: `multipart/form-data` (字段: `payload` JSON字符串, `file` ZIP文件流)。
-        *   记录每次投递的 Response Status 和 Error Message。
-        
-7.  **本体更新 (Overwrite Logic)**
-    *   **Trigger**: 上传同名文件 (Name check).
-    *   **Process**:
-        1.  检测到同名，标记 `is_updated=True`。
-        2.  保留原 Database ID，更新 `upload_time`。
-        3.  删除旧的 `OntologyFile` 记录和磁盘文件。
-        4.  解压新 ZIP，重新生成 `OntologyFile` 记录。
-    *   **Frontend**: 弹出确认框 -> 调用上传接口 -> 显示 "已更新"。
-
-## 5. 前端架构 (Frontend Architecture)
-
-*   **框架**: Vue 3 + Vite
-*   **UI 组件库**: Element Plus
-*   **关键组件**:
-    *   `WebhookManager.vue`: 管理订阅列表，查看详细日志。
-    *   `DeliveryStatusDialog.vue`: 轮询展示单次上传的 Webhook 推送进度。
-*   **Markdown 渲染**: `markdown-it` + `github-markdown-css`。
+1.  **Zip Slip 防护**: 在解压 ZIP 包时，严格检查 `zip_info.filename`，防止 `../../` 路径遍历攻击覆盖系统文件。
+2.  **路径隔离**: 所有上传文件强制存储在 `backend/data/ontology_storage/{uuid}/` 目录下，物理隔离。
+3.  **输入校验**: 使用 Pydantic (Schemas) 对所有 API 输入进行严格的数据类型和格式校验。
+4.  **SQL 注入防护**: 使用 SQLAlchemy ORM，自动参数化查询，杜绝 SQL 注入风险。

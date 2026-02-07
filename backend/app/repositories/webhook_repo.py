@@ -56,14 +56,27 @@ class WebhookRepository:
         self.db.refresh(webhook)
         return webhook
 
-    def get_webhooks_by_event(self, event_type: str, ontology_name: str = None) -> List[models.Webhook]:
+    def get_webhooks_by_event(self, event_type: str, ontology_name: str = None, ontology_code: str = None) -> List[models.Webhook]:
         query = self.db.query(models.Webhook).filter(models.Webhook.event_type == event_type)
+        
+        # Logic: 
+        # 1. Global webhooks (filter is None or empty) -> ALWAYS include
+        # 2. Filter matches name -> include
+        # 3. Filter matches code -> include
+        
+        # Construct OR conditions
+        conditions = [
+            models.Webhook.ontology_filter == None,
+            models.Webhook.ontology_filter == ""
+        ]
+        
         if ontology_name:
-            query = query.filter(or_(
-                models.Webhook.ontology_filter == None,
-                models.Webhook.ontology_filter == "",
-                models.Webhook.ontology_filter == ontology_name
-            ))
+            conditions.append(models.Webhook.ontology_filter == ontology_name)
+        
+        if ontology_code:
+            conditions.append(models.Webhook.ontology_filter == ontology_code)
+            
+        query = query.filter(or_(*conditions))
         return query.all()
 
     def create_delivery(self, 

@@ -14,26 +14,94 @@
                 <span>上传本体 (ZIP)</span>
               </div>
             </template>
-            <el-upload
-              class="upload-demo"
-              drag
-              action="/api/ontologies"
-              :show-file-list="false"
-              :on-success="handleUploadSuccess"
-              :on-error="handleUploadError"
-              :before-upload="handleBeforeUpload"
-              accept=".zip"
-            >
-              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-              <div class="el-upload__text">
-                拖拽 ZIP 文件到此处或 <em>点击上传</em>
-              </div>
-              <template #tip>
-                <div class="el-upload__tip">
-                  仅支持 .zip 文件，最大 50MB
-                </div>
-              </template>
-            </el-upload>
+            
+            <el-tabs v-model="uploadTab" type="card">
+                <!-- Tab 1: 新建本体 -->
+                <el-tab-pane label="新建本体" name="new">
+                    <el-form :model="newOntologyForm" label-width="100px">
+                        <el-form-item label="本体编码" required>
+                            <el-input v-model="newOntologyForm.code" placeholder="全局唯一标识 (e.g. auth-module)" />
+                        </el-form-item>
+                        <el-form-item label="显示名称">
+                            <el-input v-model="newOntologyForm.name" placeholder="人类可读名称 (e.g. 认证模块)" />
+                        </el-form-item>
+                        <el-form-item label="文件" required>
+                             <el-upload
+                                class="upload-demo"
+                                ref="newUploadRef"
+                                action="/api/ontologies"
+                                :data="{ 
+                                    code: newOntologyForm.code, 
+                                    name: newOntologyForm.name
+                                }"
+                                :show-file-list="true"
+                                :auto-upload="false"
+                                :on-success="handleUploadSuccess"
+                                :on-error="handleUploadError"
+                                accept=".zip"
+                                :limit="1"
+                                :on-exceed="handleExceedNew"
+                                :on-change="(file) => handleFileChange(file, 'new')"
+                            >
+                                <template #trigger>
+                                    <el-button type="primary">选择 ZIP 文件</el-button>
+                                </template>
+                            </el-upload>
+                        </el-form-item>
+                        <div style="margin-top: 20px;">
+                            <el-button type="success" @click="submitNewOntology" :disabled="!newOntologyForm.code || !newFileSelected" style="width: 100%;">
+                                <el-icon style="margin-right: 5px"><upload-filled /></el-icon> 创建并上传
+                            </el-button>
+                        </div>
+                    </el-form>
+                </el-tab-pane>
+
+                <!-- Tab 2: 新增版本 -->
+                <el-tab-pane label="新增版本" name="version">
+                     <el-form :model="newVersionForm" label-width="100px">
+                        <el-form-item label="选择本体" required>
+                            <el-select v-model="newVersionForm.code" placeholder="请选择本体" filterable style="width: 100%">
+                                <el-option
+                                    v-for="item in uniqueOntologyCodes"
+                                    :key="item.code"
+                                    :label="item.name ? `${item.name} (${item.code})` : item.code"
+                                    :value="item.code"
+                                />
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="文件" required>
+                             <el-upload
+                                class="upload-demo"
+                                ref="versionUploadRef"
+                                :action="`/api/ontologies/${newVersionForm.code}/versions`"
+                                :data="{}"
+                                :show-file-list="true"
+                                :auto-upload="false"
+                                :on-success="handleUploadSuccess"
+                                :on-error="handleUploadError"
+                                accept=".zip"
+                                :limit="1"
+                                :on-exceed="handleExceedVersion"
+                                :on-change="(file) => handleFileChange(file, 'version')"
+                            >
+                                <template #trigger>
+                                    <el-button type="primary">选择 ZIP 文件</el-button>
+                                </template>
+                            </el-upload>
+                        </el-form-item>
+                        <div style="margin-top: 20px;">
+                             <el-button 
+                                type="success" 
+                                @click="submitNewVersion" 
+                                :disabled="!newVersionForm.code || !versionFileSelected"
+                                style="width: 100%;"
+                            >
+                                <el-icon style="margin-right: 5px"><upload-filled /></el-icon> 上传新版本
+                            </el-button>
+                        </div>
+                    </el-form>
+                </el-tab-pane>
+            </el-tabs>
           </el-card>
 
           <!-- 列表区域 -->
@@ -45,10 +113,25 @@
               </div>
             </template>
             <el-table :data="tableData" style="width: 100%" v-loading="loading">
-              <el-table-column prop="name" label="名称" width="250" />
+              <el-table-column prop="code" label="编码" width="180">
+                  <template #default="scope">
+                      <el-tag type="info" effect="plain">{{ scope.row.code || '-' }}</el-tag>
+                  </template>
+              </el-table-column>
+              <el-table-column prop="name" label="名称" width="200" />
               <el-table-column label="版本" width="100">
                   <template #default="scope">
                       <el-tag effect="dark" size="small">v{{ scope.row.version }}</el-tag>
+                      <el-tooltip content="新增版本" placement="top">
+                        <el-button 
+                            type="primary" 
+                            link 
+                            :icon="Plus" 
+                            size="small" 
+                            style="margin-left: 5px"
+                            @click="openAddVersion(scope.row)"
+                        />
+                    </el-tooltip>
                   </template>
               </el-table-column>
               <el-table-column prop="status" label="状态" width="100">
@@ -62,15 +145,15 @@
                     placement="top" 
                     trigger="click" 
                     :width="300"
-                    @show="fetchSubscriptionStatus(scope.row.name)"
+                    @show="fetchSubscriptionStatus(scope.row)"
                   >
                     <template #reference>
                       <el-button link type="primary">
-                        查看订阅 ({{ getEffectiveWebhooksCount(scope.row.name) }})
+                        查看订阅 ({{ getEffectiveWebhooksCount(scope.row) }})
                       </el-button>
                     </template>
                     
-                    <el-table :data="subscriptionStatus[scope.row.name] || []" size="small" v-loading="!subscriptionStatus[scope.row.name]">
+                    <el-table :data="subscriptionStatus[scope.row.code || scope.row.name] || []" size="small" v-loading="!subscriptionStatus[scope.row.code || scope.row.name]">
                        <el-table-column prop="webhook_name" label="订阅名称" show-overflow-tooltip></el-table-column>
                        <el-table-column label="生效版本" width="100">
                           <template #default="subScope">
@@ -92,7 +175,6 @@
               <el-table-column label="操作" fixed="right" min-width="320">
                 <template #default="scope">
                   <el-button size="small" @click="handleView(scope.row)">详情</el-button>
-                  <el-button size="small" type="primary" @click="handleUpdate(scope.row)">更新</el-button>
                   <el-button size="small" @click="handleHistory(scope.row)">版本</el-button>
                   <el-button size="small" type="info" plain @click="handleOntologyLogs(scope.row)">日志</el-button>
                 </template>
@@ -137,6 +219,59 @@
       </div>
     </el-dialog>
     
+    <!-- Version Diff Dialog -->
+    <el-dialog 
+        v-model="diffVisible" 
+        title="版本差异对比" 
+        width="95%" 
+        top="5vh"
+        destroy-on-close
+    >
+        <div v-if="diffLoading" style="padding: 40px; text-align: center;">
+            <el-skeleton :rows="10" animated />
+        </div>
+        <div v-else-if="diffResult" class="diff-wrapper">
+            <div class="diff-sidebar">
+                <div class="sidebar-header">
+                    <span>文件变更 ({{ diffResult.files.filter(f => f.status !== 'unchanged').length }})</span>
+                </div>
+                <div class="diff-file-list">
+                    <div v-for="file in diffResult.files" :key="file.file_path" 
+                         class="diff-file-item"
+                         :class="[file.status, selectedDiffFile?.file_path === file.file_path ? 'is-active' : '']"
+                         @click="selectedDiffFile = file"
+                    >
+                        <span class="status-dot"></span>
+                        <span class="file-path">{{ file.file_path }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="diff-main">
+                <template v-if="selectedDiffFile">
+                    <div class="diff-main-header">
+                        <el-tag size="small" :type="getDiffTagType(selectedDiffFile.status)">{{ selectedDiffFile.status.toUpperCase() }}</el-tag>
+                        <span class="current-path">{{ selectedDiffFile.file_path }}</span>
+                    </div>
+                    <div class="diff-viewer-area">
+                        <code-diff
+                            v-if="selectedDiffFile.base_content !== null || selectedDiffFile.target_content !== null"
+                            :old-string="selectedDiffFile.base_content || ''"
+                            :new-string="selectedDiffFile.target_content || ''"
+                            output-format="side-by-side"
+                            style="height: 60vh"
+                        />
+                        <div v-else class="empty-diff">
+                            <el-empty :description="selectedDiffFile.status === 'unchanged' ? '该文件内容未发生变化' : '该文件类型暂不支持内容级对比'" />
+                        </div>
+                    </div>
+                </template>
+                <div v-else class="empty-diff">
+                    <el-empty description="请选择左侧文件查看详细差异" />
+                </div>
+            </div>
+        </div>
+    </el-dialog>
+
     <!-- Delivery Status Dialog -->
     <delivery-status-dialog 
         v-model="deliveryDialogVisible" 
@@ -151,10 +286,25 @@
                 <el-button circle size="small" @click="refreshHistory">
                     <el-icon><Refresh /></el-icon>
                 </el-button>
+                <el-button 
+                    type="primary" 
+                    size="small" 
+                    :disabled="selectedVersions.length !== 2" 
+                    @click="handleCompare"
+                >
+                    对比选中 ({{ selectedVersions.length }}/2)
+                </el-button>
             </div>
         </template>
         
-        <el-table :data="historyData" style="width: 100%" v-loading="historyLoading">
+        <el-table 
+            :data="historyData" 
+            style="width: 100%" 
+            v-loading="historyLoading"
+            @selection-change="handleSelectionChange"
+            ref="historyTableRef"
+        >
+            <el-table-column type="selection" width="55" />
             <el-table-column prop="version" label="版本" width="80">
                 <template #default="scope">v{{ scope.row.version }}</template>
             </el-table-column>
@@ -250,7 +400,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { UploadFilled, Refresh } from '@element-plus/icons-vue'
+import { UploadFilled, Refresh, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import MarkdownIt from 'markdown-it'
@@ -259,6 +409,7 @@ import 'github-markdown-css'
 import WebhookManager from './components/WebhookManager.vue'
 import DeliveryStatusDialog from './components/DeliveryStatusDialog.vue'
 import WebhookLogDrawer from './components/WebhookLogDrawer.vue'
+import { CodeDiff } from 'v-code-diff'
 
 const md = new MarkdownIt({
     html: true,
@@ -284,6 +435,78 @@ const historyData = ref([])
 const historyDrawerTitle = ref('')
 const currentHistoryRow = ref(null)
 
+// Upload Logic
+const uploadTab = ref('new')
+const newUploadRef = ref(null)
+const versionUploadRef = ref(null)
+const newFileSelected = ref(false)
+const versionFileSelected = ref(false)
+const selectedVersions = ref([])
+const historyTableRef = ref(null)
+
+const diffVisible = ref(false)
+const diffLoading = ref(false)
+const diffResult = ref(null)
+const selectedDiffFile = ref(null)
+
+const getDiffTagType = (status) => {
+    if (status === 'added') return 'success'
+    if (status === 'deleted') return 'danger'
+    if (status === 'modified') return 'warning'
+    return 'info'
+}
+
+const newOntologyForm = ref({
+    code: '',
+    name: ''
+})
+
+const newVersionForm = ref({
+    code: ''
+})
+
+const uniqueOntologyCodes = computed(() => {
+    // Extract unique codes from tableData to populate dropdown
+    // Note: tableData might contain multiple versions if we were listing all, 
+    // but default list is latest active? Actually list endpoint returns "OntologyPackage".
+    // We should probably rely on a computed property that groups by code or just distinct codes.
+    const map = new Map()
+    tableData.value.forEach(item => {
+        if (item.code && !map.has(item.code)) {
+             map.set(item.code, item)
+        }
+    })
+    return Array.from(map.values())
+})
+
+const handleExceedNew = (files) => {
+    newUploadRef.value.clearFiles()
+    const file = files[0]
+    newUploadRef.value.handleStart(file)
+}
+
+const handleExceedVersion = (files) => {
+    versionUploadRef.value.clearFiles()
+    const file = files[0]
+    versionUploadRef.value.handleStart(file)
+}
+
+const handleFileChange = (file, type) => {
+    if (type === 'new') {
+        newFileSelected.value = true
+    } else {
+        versionFileSelected.value = true
+    }
+}
+
+const submitNewOntology = () => {
+    newUploadRef.value.submit()
+}
+
+const submitNewVersion = () => {
+    versionUploadRef.value.submit()
+}
+
 // 更新相关
 const updateInput = ref(null)
 const currentUpdateRow = ref(null)
@@ -304,26 +527,39 @@ const webhookCount = computed(() => webhooks.value.length)
 // 订阅状态返回 (name-> status list)
 const subscriptionStatus = ref({})
 
-const fetchSubscriptionStatus = async (ontologyName) => {
-  // 如果已经有了，可以选择不重复信号，但为了实时性我们每次打开都刷新
+const fetchSubscriptionStatus = async (row) => {
+  // Use code primarily if available
+  const params = {}
+  if (row.code) params.code = row.code
+  if (row.name) params.name = row.name
+
   try {
     const res = await axios.get('/api/subscriptions/ontologies/status', {
-      params: { name: ontologyName }
+      params: params
     })
-    subscriptionStatus.value[ontologyName] = res.data
+    // Key by code if available, else name
+    const key = row.code || row.name
+    subscriptionStatus.value[key] = res.data
   } catch (error) {
     console.error('获取订阅状态失败', error)
   }
 }
 
-const getEffectiveWebhooksCount = (name) => {
-  return webhooks.value.filter(wh => !wh.ontology_filter || wh.ontology_filter === name).length
+const getEffectiveWebhooksCount = (row) => {
+  const name = row.name
+  const code = row.code
+  return webhooks.value.filter(wh => {
+      if (!wh.ontology_filter) return true
+      return wh.ontology_filter === name || (code && wh.ontology_filter === code)
+  }).length
 }
 
 const getEffectiveWebhooks = (row) => {
+    const name = row.name
+    const code = row.code
     return webhooks.value.filter(wh => {
-        // 全局订阅 (没有过滤器) 或者 匹配当前本体名称的精准订阅
-        return !wh.ontology_filter || wh.ontology_filter === row.name
+         if (!wh.ontology_filter) return true
+         return wh.ontology_filter === name || (code && wh.ontology_filter === code)
     })
 }
 
@@ -357,7 +593,7 @@ const fetchOntologyLogs = async () => {
     ontologyLogsLoading.value = true
     try {
         const res = await axios.get('/api/logs/ontologies', {
-            params: { name: currentOntologyNameForLogs.value }
+            params: { name: currentOntologyNameForLogs.value } // Logs still use name? Ideally verify backend
         })
         ontologyLogsData.value = res.data
     } catch (e) {
@@ -366,6 +602,15 @@ const fetchOntologyLogs = async () => {
         ontologyLogsLoading.value = false
     }
 }
+
+const openAddVersion = (row) => {
+    uploadTab.value = 'version'
+    newVersionForm.value.code = row.code
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+
 
 const fetchOntologies = async () => {
   loading.value = true
@@ -397,7 +642,7 @@ const refreshHistory = async () => {
     
     try {
         const res = await axios.get('/api/ontologies', {
-            params: { name: currentHistoryRow.value.name, all_versions: true }
+            params: { code: currentHistoryRow.value.code, all_versions: true }
         })
         historyData.value = res.data
     } catch (e) {
@@ -439,25 +684,68 @@ const handleActivate = async (row) => {
     }
 }
 
-// 上传前检查: 版本升级提示
-const handleBeforeUpload = async (file) => {
-    const existing = tableData.value.find(item => item.name === file.name)
-    if (existing) {
-        // Optional: show a toast instead of blocking dialog
-        ElMessage.info(`检测到同名本体，将自动上传为 v${existing.version + 1}`)
+const handleSelectionChange = (selection) => {
+    if (selection.length > 2) {
+        // Keep only last 2
+        const lastTwo = selection.slice(-2)
+        historyTableRef.value.clearSelection()
+        lastTwo.forEach(row => {
+            historyTableRef.value.toggleRowSelection(row, true)
+        })
+        selectedVersions.value = lastTwo
+    } else {
+        selectedVersions.value = selection
     }
-    return true
 }
 
+const handleCompare = async () => {
+    if (selectedVersions.value.length !== 2) return
+    
+    // Sort by version descending to find base/target
+    const sorted = [...selectedVersions.value].sort((a, b) => a.version - b.version)
+    const base = sorted[0]
+    const target = sorted[1]
+    
+    selectedDiffFile.value = null // Reset selected file state
+    diffLoading.value = true
+    diffVisible.value = true
+    diffResult.value = null
+    
+    try {
+        const res = await axios.get('/api/ontologies/compare', {
+            params: {
+                base_id: base.id,
+                target_id: target.id
+            }
+        })
+        diffResult.value = res.data
+    } catch (e) {
+        ElMessage.error('对比失败')
+        diffVisible.value = false
+    } finally {
+        diffLoading.value = false
+    }
+}
+
+// Removed: handleBeforeUpload is no longer needed as we use manual submit
+// const handleBeforeUpload = async (file) => ...
+
 const handleUploadSuccess = (response) => {
-  if (response.is_updated) {
-    ElMessage.success(`本体 "${response.name}" 已更新`)
-  } else {
-    ElMessage.success('上传成功')
-  }
+  ElMessage.success(`上传成功: ${response.code} v${response.version}`)
   fetchOntologies()
   
-  // Show delivery status
+  // Clear forms
+  if (uploadTab.value === 'new') {
+      newOntologyForm.value = { code: '', name: '' }
+      newUploadRef.value.clearFiles()
+      newFileSelected.value = false
+  } else {
+      newVersionForm.value = { code: '' }
+      versionUploadRef.value.clearFiles()
+      versionFileSelected.value = false
+  }
+  
+  // Show delivery status (reuse dialog? Wait, response might be bare list or single obj)
   if (response.id) {
     lastUploadedPackageId.value = response.id
     deliveryDialogVisible.value = true
@@ -500,7 +788,7 @@ const handleDelete = (row) => {
       // Refresh history if drawer is open
       if (historyDrawerVisible.value) {
            const res = await axios.get('/api/ontologies', {
-                params: { name: row.name, all_versions: true }
+                params: { code: row.code, all_versions: true }
            })
            historyData.value = res.data
       }
@@ -634,6 +922,99 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: #f0f2f5;
 }
+.diff-wrapper {
+  display: flex;
+  height: 75vh;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+}
+
+.diff-sidebar {
+  width: 280px;
+  border-right: 1px solid #ebeef5;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 12px;
+  background: #f8f9fa;
+  font-weight: bold;
+  font-size: 13px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.diff-file-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.diff-file-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.diff-file-item:hover {
+  background: #f0f2f5;
+}
+
+.diff-file-item.is-active {
+  background: #ecf5ff;
+  color: #409eff;
+  font-weight: 500;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #909399;
+}
+
+.added .status-dot { background: #67c23a; }
+.deleted .status-dot { background: #f56c6c; }
+.modified .status-dot { background: #e6a23c; }
+
+.diff-file-item .file-path {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.diff-main-header {
+  padding: 10px 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.diff-viewer-area {
+  flex: 1;
+  overflow: auto;
+}
+
+.empty-diff {
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .layout-container {
   height: 100vh;
 }
