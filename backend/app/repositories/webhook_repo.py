@@ -129,3 +129,12 @@ class WebhookRepository:
             .filter(models.WebhookDelivery.event_type == "ontology.activated")\
             .filter(models.WebhookDelivery.payload.contains(search_key))\
             .all()
+
+    def get_name_by_code(self, code: str) -> Optional[str]:
+        # Helper to bridge the gap without full circular dependency on OntologyRepo
+        # We assume OntologyPackage model is available
+        pkg = self.db.query(models.OntologyPackage)\
+            .filter(models.OntologyPackage.code == code)\
+            .order_by(desc(models.OntologyPackage.version))\
+            .first()
+        return pkg.name if pkg else None

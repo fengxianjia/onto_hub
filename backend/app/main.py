@@ -123,7 +123,7 @@ def _broadcast_activation(package, service, webhook_service, background_tasks):
     webhook_service.broadcast_event(
         event_type="ontology.activated",
         payload=payload,
-        ontology_name=package.name, # TODO: Filter by Code?
+        ontology_name=package.code, # Use Code for strict filtering
         background_tasks=background_tasks,
         file_path=service.get_source_zip_path(package.id)
     )
@@ -207,12 +207,57 @@ def activate_ontology(
     webhook_service.broadcast_event(
         event_type="ontology.activated",
         payload=payload,
-        ontology_name=package.name,
+        ontology_name=package.code, # Use Code for strict recording
         background_tasks=background_tasks,
         file_path=service.get_source_zip_path(package.id)
     )
         
     return {"status": "activated", "version": package.version}
+    
+@app.post("/api/ontologies/{id}/push")
+async def push_ontology_to_webhook(
+    id: str,
+    webhook_id: str = Query(..., description="目标 Webhook ID"),
+    background_tasks: BackgroundTasks = None, # Make it optional? No, required for injection
+    service: OntologyService = Depends(get_ontology_service),
+    webhook_service: WebhookService = Depends(get_webhook_service)
+):
+    """
+    **手动触发推送**
+    将指定版本的本体推送到指定的 Webhook，不改变本体的激活状态。
+    同步等待推送结果，以便前端展示。
+    """
+    # 1. 获取本体包信息
+    package = service.onto_repo.get_package(id)
+    if not package:
+        raise HTTPException(status_code=404, detail="Ontology package not found")
+        
+    # 2. 获取源文件路径
+    zip_path = service.get_source_zip_path(package.id)
+    
+    # 3. 触发单点推送 (同步)
+    result = await webhook_service.trigger_subscription(package, webhook_id, background_tasks, zip_path, sync=True)
+    
+    return {
+        "status": "pushed", 
+        "package": package.code, 
+        "version": package.version, 
+        "target": webhook_id,
+        "delivery_result": result
+    }
+
+@app.delete("/api/ontologies/{id}", status_code=204)
+def delete_ontology_version(
+    id: str,
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """
+    **删除指定版本的本体**
+    - 不能删除当前激活的版本
+    - 不能删除被 Webhook 订阅引用的版本
+    """
+    service.delete_ontology(id)
+    return None
 
 @app.get("/api/ontologies/compare", response_model=schemas.OntologyComparisonResponse)
 async def compare_ontologies(
@@ -222,6 +267,16 @@ async def compare_ontologies(
 ):
     """比较两个本体版本之间的差异"""
     return await service.compare_packages(base_id, target_id)
+
+@app.get("/api/ontologies/by-code/{code}/subscriptions")
+def get_ontology_subscriptions(
+    code: str,
+    service: WebhookService = Depends(get_webhook_service)
+):
+    """获取订阅了指定本体的所有 Webhook 及其使用的版本"""
+    # 直接使用 code 查询订阅,不需要先查询本体是否存在
+    # 因为即使本体不存在,也可能有 webhook 订阅了它(提前注册)
+    return service.get_subscription_status(name=None, code=code)
 
 @app.get("/api/ontologies/{id}", response_model=schemas.OntologyPackageDetailResponse)
 def get_ontology_detail(
@@ -239,9 +294,9 @@ def get_ontology_deliveries(
     """
     **获取本体包的 Webhook 推送状态**
     """
-    # 必须先获取本体名称以过滤 Webhook
+    # 必须先获取本体Code以过滤 Webhook
     package = onto_service.get_ontology_detail(id)
-    return webhook_service.get_ontology_delivery_status(id, package.name)
+    return webhook_service.get_ontology_delivery_status(id, package.code) # Use Code
 
 @app.get("/api/ontologies/{id}/files")
 def read_ontology_file(

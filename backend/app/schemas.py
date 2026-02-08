@@ -31,8 +31,6 @@ class OntologyPackageResponse(OntologyPackageBase):
     error_msg: Optional[str] = None
     file_count: int = 0
     is_updated: bool = False
-    # New field to show successful deliveries for this version
-    delivered_webhooks: Optional[List[str]] = []
     
     # Deletion safety flags
     is_deletable: bool = True

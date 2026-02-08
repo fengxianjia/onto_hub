@@ -1,0 +1,99 @@
+/* 设计令牌 - CSS 自定义属性 */
+:root {
+    /* 颜色 */
+    --background: #FAFAFA;
+    --foreground: #0F172A;
+    --muted: #F1F5F9;
+    --muted-foreground: #64748B;
+    --accent: #0052FF;
+    --accent-secondary: #4D7CFF;
+    --accent-foreground: #FFFFFF;
+    --border: #E2E8F0;
+    --card: #FFFFFF;
+    --ring: #0052FF;
+
+    /* 字体 */
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-display: 'Calistoga', Georgia, serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* 阴影 */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1);
+    --shadow-accent: 0 4px 14px rgba(0, 82, 255, 0.25);
+    --shadow-accent-lg: 0 8px 24px rgba(0, 82, 255, 0.35);
+}
+
+/* 全局样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--background);
+    color: var(--foreground);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* 渐变文本效果 */
+.gradient-text {
+    background: linear-gradient(to right, var(--accent), var(--accent-secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* 渐变下划线 */
+.gradient-underline {
+    position: absolute;
+    bottom: -0.25rem;
+    left: 0;
+    height: 0.75rem;
+    width: 100%;
+    border-radius: 0.125rem;
+    background: linear-gradient(to right, rgba(0, 82, 255, 0.15), rgba(77, 124, 255, 0.1));
+}
+
+@media (min-width: 768px) {
+    .gradient-underline {
+        bottom: -0.5rem;
+        height: 1rem;
+    }
+}
+
+/* 点阵纹理背景 */
+.dot-pattern {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+}

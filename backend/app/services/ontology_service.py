@@ -143,8 +143,13 @@ class OntologyService:
         # 如果查询的是版本列表，需要增加安全性标记
         if (name or code) and all_versions:
             # We use code for filter now ideally
-            target_filter = code if code else name # fallback
-            in_use_ids = self.webhook_service.get_in_use_package_ids(target_filter) # Wait, webhook filter uses NAME or CODE? 
+            target_filter = code if code else None 
+            # If code is missing but name is present, we might be in trouble if we enforce code strictness here.
+            # Ideally frontend passes code.
+            
+            in_use_ids = []
+            if target_filter:
+                 in_use_ids = self.webhook_service.get_in_use_package_ids(target_filter)
             # Webhook model has ontology_filter. Ideally this should match CODE now. 
             # But let's keep it robust. If we changed ontology to have code, webhooks should probably filter by code too.
             # For now, let's assume webhook filter matches what is stored in ontology_filter.
@@ -181,7 +186,7 @@ class OntologyService:
         result = schemas.OntologyPackageDetailResponse.model_validate(package)
 
         # 详情页同样补充安全性标记
-        in_use_ids = self.webhook_service.get_in_use_package_ids(package.name)
+        in_use_ids = self.webhook_service.get_in_use_package_ids(package.code) # Use Code
         if result.is_active:
             result.is_deletable = False
             result.deletable_reason = "当前版本已启用"
@@ -216,7 +221,7 @@ class OntologyService:
             raise HTTPException(status_code=400, detail="正在启用的版本不能删除")
             
         # 安全校验：订阅者正在使用的不能删
-        in_use_ids = self.webhook_service.get_in_use_package_ids(package.name)
+        in_use_ids = self.webhook_service.get_in_use_package_ids(package.code) # Use Code
         if package.id in in_use_ids:
             raise HTTPException(status_code=400, detail="该版本正在 Webhook 订阅中使用，不能删除")
 

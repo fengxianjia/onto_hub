@@ -99,8 +99,6 @@ async def send_webhook_request(
                 await asyncio.sleep(retry_delay) # 异步等待，不阻塞线程
                 retry_delay *= 2 # 指数退避
 
-    # 3. 记录日志到数据库
-    if save_log:
         await _save_delivery_log(
             webhook_id=webhook_id,
             event_type=event_type,
@@ -110,6 +108,12 @@ async def send_webhook_request(
             response_status=response_status,
             error_message=error_message
         )
+        
+    return {
+        "status": status,
+        "response_status": response_status,
+        "error_message": error_message
+    }
 
 async def broadcast_webhook_requests(requests_data: list):
     """

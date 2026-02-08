@@ -1,73 +1,81 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    title="Webhook 推送状态"
-    width="600px"
+  <Dialog 
+    v-model="visible" 
+    title="Webhook 推送状态" 
+    width="700px"
     :close-on-click-modal="false"
-    :close-on-press-escape="false"
   >
-    <div v-if="loading" class="loading-state">
-      <el-skeleton :rows="3" animated />
+    <!-- Loading State -->
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <Loading />
     </div>
-    
+
+    <!-- Empty State -->
+    <div v-else-if="!deliveries.length" class="py-12">
+      <Empty description="没有配置相关的 Webhook 订阅" />
+    </div>
+
+    <!-- Table -->
     <div v-else>
-      <div v-if="deliveries.length === 0" class="empty-state">
-        <el-empty description="没有配置相关的 Webhook 订阅" image-size="60" />
+      <div class="overflow-x-auto rounded-lg">
+        <table class="w-full">
+          <thead class="bg-gradient-to-r from-muted/80 to-muted/40">
+            <tr>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground">目标 URL</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground">状态</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground">Code</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground">详情</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            <tr v-for="(row, index) in deliveries" :key="index" 
+                :class="['transition-all duration-200 hover:bg-accent/5', index % 2 === 0 ? 'bg-white' : 'bg-muted/20']">
+              <td class="px-6 py-4 text-sm max-w-xs truncate">{{ row.target_url }}</td>
+              <td class="px-6 py-4">
+                <Badge :variant="getStatusVariant(row.status)">{{ getStatusText(row.status) }}</Badge>
+              </td>
+              <td class="px-6 py-4 text-sm">{{ row.response_status || '-' }}</td>
+              <td class="px-6 py-4">
+                <div v-if="row.error_message" class="flex items-center gap-2 text-red-500">
+                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span class="text-xs">{{ row.error_message }}</span>
+                </div>
+                <span v-else class="text-muted-foreground">-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      
-      <el-table v-else :data="deliveries" style="width: 100%">
-        <el-table-column prop="target_url" label="目标 URL" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
-              {{ getStatusText(scope.row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="response_status" label="Code" width="80">
-           <template #default="scope">
-               <span v-if="scope.row.response_status">{{ scope.row.response_status }}</span>
-               <span v-else>-</span>
-           </template>
-        </el-table-column>
-        <el-table-column label="详情" width="80">
-           <template #default="scope">
-             <el-tooltip 
-                v-if="scope.row.error_message" 
-                class="box-item" 
-                effect="dark" 
-                :content="scope.row.error_message" 
-                placement="top"
-             >
-                <el-icon color="red"><Warning /></el-icon>
-             </el-tooltip>
-             <span v-else>-</span>
-           </template>
-        </el-table-column>
-      </el-table>
-      
-      <div class="progress-footer">
-          <span v-if="isPolling">
-             <el-icon class="is-loading"><Loading /></el-icon> 正在等待推送结果...
-          </span>
-          <span v-else-if="allFinished">
-             推送完成
-          </span>
+
+      <!-- Progress Footer -->
+      <div class="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <div v-if="isPolling" class="flex items-center gap-2">
+          <div class="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent"></div>
+          <span>正在等待推送结果...</span>
+        </div>
+        <div v-else-if="allFinished" class="flex items-center gap-2 text-green-600">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="font-medium">推送完成</span>
+        </div>
       </div>
     </div>
 
     <template #footer>
-      <span class="dialog-footer">
-        <el-button @click="closeConfig">关闭</el-button>
-      </span>
+      <div class="flex justify-end">
+        <Button variant="secondary" @click="closeConfig">关闭</Button>
+      </div>
     </template>
-  </el-dialog>
+  </Dialog>
 </template>
 
 <script setup>
 import { ref, watch, computed, onUnmounted } from 'vue'
 import axios from 'axios'
-import { Warning, Loading } from '@element-plus/icons-vue'
+import { Dialog, Button, Badge, Loading, Empty } from './index.js'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -86,87 +94,69 @@ const loading = ref(false)
 const timer = ref(null)
 
 const isPolling = computed(() => {
-    // If any item is PENDING, we are polling (or should be)
-    return deliveries.value.some(d => d.status === 'PENDING')
+  return deliveries.value.some(d => d.status === 'PENDING')
 })
 
 const allFinished = computed(() => {
-    return deliveries.value.length > 0 && !isPolling.value
+  return deliveries.value.length > 0 && !isPolling.value
 })
 
-const getStatusType = (status) => {
+const getStatusVariant = (status) => {
   if (status === 'SUCCESS') return 'success'
   if (status === 'FAILURE') return 'danger'
   return 'info' // PENDING
 }
 
 const getStatusText = (status) => {
-  if (status === 'SUCCESS') return '成功'
-  if (status === 'FAILURE') return '失败'
-  return '等待中'
+  const statusMap = {
+    'SUCCESS': '成功',
+    'FAILURE': '失败',
+    'PENDING': '等待中'
+  }
+  return statusMap[status] || status
 }
 
-const fetchStatus = async () => {
-    if (!props.packageId) return
-    try {
-        const res = await axios.get(`/api/ontologies/${props.packageId}/deliveries`)
-        deliveries.value = res.data
-        
-        // Check if we should stop polling
-        const hasPending = res.data.some(d => d.status === 'PENDING')
-        if (!hasPending && timer.value) {
-            clearInterval(timer.value)
-            timer.value = null
-        }
-    } catch (e) {
-        console.error("Failed to fetch delivery status", e)
+const fetchDeliveries = async () => {
+  if (!props.packageId) return
+  
+  try {
+    const res = await axios.get(`/api/ontologies/${props.packageId}/deliveries`)
+    deliveries.value = res.data
+    
+    if (isPolling.value) {
+      timer.value = setTimeout(fetchDeliveries, 2000)
     }
+  } catch (error) {
+    console.error('Failed to fetch deliveries', error)
+  }
 }
 
-watch(() => props.modelValue, (val) => {
-    if (val && props.packageId) {
-        loading.value = true
-        deliveries.value = []
-        // Initial fetch
-        fetchStatus().then(() => {
-            loading.value = false
-            // Start polling if needed
-            if (isPolling.value) {
-                timer.value = setInterval(fetchStatus, 2000)
-            }
-        })
-    } else {
-        if (timer.value) {
-            clearInterval(timer.value)
-            timer.value = null
-        }
+const closeConfig = () => {
+  if (timer.value) {
+    clearTimeout(timer.value)
+    timer.value = null
+  }
+  visible.value = false
+}
+
+watch(() => props.modelValue, (newVal) => {
+  if (newVal && props.packageId) {
+    loading.value = true
+    deliveries.value = []
+    fetchDeliveries().finally(() => {
+      loading.value = false
+    })
+  } else {
+    if (timer.value) {
+      clearTimeout(timer.value)
+      timer.value = null
     }
+  }
 })
 
 onUnmounted(() => {
-    if (timer.value) clearInterval(timer.value)
+  if (timer.value) {
+    clearTimeout(timer.value)
+  }
 })
-
-const closeConfig = () => {
-  visible.value = false
-}
 </script>
-
-<style scoped>
-.loading-state {
-    padding: 20px;
-}
-.empty-state {
-    padding: 20px;
-}
-.progress-footer {
-    margin-top: 15px;
-    text-align: right;
-    color: #909399;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 5px;
-}
-</style>
