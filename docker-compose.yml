@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ontohub-backend:${VERSION:-latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ontohub-backend
+    restart: always
+    environment:
+      - ENV=production
+      - DATABASE_URL=sqlite:///./data/ontohub.db
+      - LOG_DIR=./logs
+      - STORAGE_DIR=./data/ontohub_storage
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    expose:
+      - "8003"
+    networks:
+      - ontohub-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ontohub-frontend
+    restart: always
+    ports:
+      - "8004:80"
+    depends_on:
+      - backend
+    networks:
+      - ontohub-network
+
+networks:
+  ontohub-network:
+    driver: bridge
+
+volumes:
+  backend-data:
+  backend-logs:

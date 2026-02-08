@@ -2,9 +2,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+from .config import settings
+
 # SQLite 数据库 URL
-# 数据库文件将存储在当前目录下的 ontohub.db
-SQLALCHEMY_DATABASE_URL = "sqlite:///./ontohub.db"
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 # 创建数据库引擎
 # connect_args={"check_same_thread": False} 是 SQLite 特有的配置，

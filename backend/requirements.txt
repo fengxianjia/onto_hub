@@ -8,3 +8,4 @@ aiofiles
 
 requests
 PyYAML
+pydantic-settings

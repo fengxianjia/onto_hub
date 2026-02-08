@@ -8,25 +8,36 @@ import os
 from datetime import datetime
 
 from . import models, schemas, database, utils
+from .config import settings
 from .repositories.ontology_repo import OntologyRepository
 from .repositories.webhook_repo import WebhookRepository
 from .services.ontology_service import OntologyService
-from .services.ontology_service import OntologyService
 from .services.webhook_service import WebhookService
 from .tasks import parse_ontology_task
+from .core.logging import setup_logging
+from .core.middleware import LoggingMiddleware
+from .routers import templates
+
+# 初始化统一日志
+setup_logging()
 
 # 自动创建数据库表
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(
-    title="OntoHub API",
+    title=settings.APP_NAME,
     description="专业级的本体管理枢纽 - 支持版本控制、异步推送与解耦架构",
-    version="2.1.0"
+    version=settings.APP_VERSION
 )
 
+# 注册路由
+app.include_router(templates.router)
+
+# 注册中间件
+app.add_middleware(LoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

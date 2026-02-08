@@ -13,15 +13,12 @@ from ..repositories.ontology_repo import OntologyRepository
 from ..repositories.webhook_repo import WebhookRepository
 from ..core.events import dispatcher
 from .. import models, schemas, utils
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
 # 配置存储路径: app/services/ontology_service.py -> backend/data/ontology_storage
-BASE_STORAGE_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
-    "data", 
-    "ontohub_storage"
-)
+BASE_STORAGE_DIR = settings.STORAGE_DIR
 os.makedirs(BASE_STORAGE_DIR, exist_ok=True)
 
 class OntologyService:

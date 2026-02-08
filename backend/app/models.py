@@ -177,3 +177,4 @@ class OntologyRelation(Base):
     package = relationship("OntologyPackage", backref="relations")
     source = relationship("OntologyEntity", foreign_keys=[source_id], backref="out_relations")
     target = relationship("OntologyEntity", foreign_keys=[target_id], backref="in_relations")
+

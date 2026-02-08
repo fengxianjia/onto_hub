@@ -148,3 +148,39 @@ class OntologyRelationDetailResponse(OntologyRelationResponse):
 class PaginatedOntologyRelationResponse(BaseModel):
     items: List[OntologyRelationDetailResponse]
     total: int
+
+# --- Auth & User Schemas ---
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+class UserBase(BaseModel):
+    username: str
+    role: Optional[str] = "user"
+
+class UserCreate(UserBase):
+    password: str
+
+class UserResponse(UserBase):
+    id: str
+    is_active: bool
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class AuditLogResponse(BaseModel):
+    id: str
+    action: str
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    summary: Optional[str] = None
+    created_at: datetime
+    username: Optional[str] = None
+
+    class Config:
+        from_attributes = True
