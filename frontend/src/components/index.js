@@ -9,6 +9,7 @@ export { default as Select } from './ui/Select.vue'
 export { default as Empty } from './ui/Empty.vue'
 export { default as Loading } from './ui/Loading.vue'
 export { default as Upload } from './ui/Upload.vue'
+export { default as Pagination } from './ui/Pagination.vue'
 
 // 布局组件导出
 export { default as Container } from './layout/Container.vue'

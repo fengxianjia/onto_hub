@@ -14,8 +14,9 @@ class WebhookService:
     def create_webhook(self, webhook_in: schemas.WebhookCreate) -> schemas.WebhookResponse:
         return self.repo.create_webhook(webhook_in)
 
-    def get_webhooks(self, skip: int = 0, limit: int = 100) -> List[schemas.WebhookResponse]:
-        return self.repo.list_webhooks(skip, limit)
+    def get_webhooks(self, skip: int = 0, limit: int = 100) -> schemas.PaginatedWebhookResponse:
+        items, total = self.repo.list_webhooks(skip, limit)
+        return {"items": items, "total": total}
 
     def delete_webhook(self, webhook_id: str):
         self.repo.delete_webhook(webhook_id)
@@ -26,8 +27,14 @@ class WebhookService:
             raise HTTPException(status_code=404, detail="Webhook not found")
         return webhook
 
-    def get_logs_by_webhook(self, webhook_id: str, skip: int = 0, limit: int = 20):
-        return self.repo.get_logs_by_webhook(webhook_id, skip, limit)
+    def get_logs_by_webhook(self, webhook_id: str, ontology_name: str = None, status: str = None, skip: int = 0, limit: int = 20) -> schemas.PaginatedWebhookDeliveryResponse:
+        deliveries, total = self.repo.get_logs_by_webhook(webhook_id, ontology_name, status, skip, limit)
+        results = []
+        for delivery, wh_name in deliveries:
+            d_dict = {c.name: getattr(delivery, c.name) for c in delivery.__table__.columns}
+            d_dict["webhook_name"] = wh_name
+            results.append(d_dict)
+        return {"items": results, "total": total}
 
     def get_logs_by_ontology(self, ontology_name: str, skip: int = 0, limit: int = 50):
         deliveries = self.repo.get_logs_by_ontology(ontology_name, skip, limit)
@@ -99,58 +106,20 @@ class WebhookService:
         }
         
         try:
-            # 现在是异步调用
-            await utils.send_webhook_request(
+            # 异步调用，且不记录日志
+            result = await utils.send_webhook_request(
                 target_url=webhook.target_url,
                 payload=payload,
                 webhook_id=webhook.id,
                 event_type="ping",
-                save_log=True,
+                save_log=False,  # 不记录日志
                 secret_token=webhook.secret_token,
                 ontology_name="SYSTEM_PING"
             )
-            # 获取刚刚记录的日志
-            deliveries = self.repo.get_logs_by_webhook(webhook.id, limit=1)
-            if not deliveries:
-                 return {"status": "FAILURE", "error_message": "No delivery log found"}
-            
-            delivery = deliveries[0]
             return {
-                "status": delivery.status,
-                "response_status": delivery.response_status,
-                "error_message": delivery.error_message
-            }
-        except Exception as e:
-            return {"status": "FAILURE", "error_message": str(e)}
-            
-        payload = {
-            "event": "ping",
-            "webhook_id": webhook.id,
-            "name": webhook.name,
-            "timestamp": utils.time.time() 
-        }
-        
-        try:
-            # 现在是异步调用
-            await utils.send_webhook_request(
-                target_url=webhook.target_url,
-                payload=payload,
-                webhook_id=webhook.id,
-                event_type="ping",
-                save_log=True,
-                secret_token=webhook.secret_token,
-                ontology_name="SYSTEM_PING"
-            )
-            # 获取刚刚记录的日志
-            deliveries = self.repo.get_logs_by_webhook(webhook.id, limit=1)
-            if not deliveries:
-                 return {"status": "FAILURE", "error_message": "No delivery log found"}
-            
-            delivery = deliveries[0]
-            return {
-                "status": delivery.status,
-                "response_status": delivery.response_status,
-                "error_message": delivery.error_message
+                "status": result["status"],
+                "response_status": result["response_status"],
+                "error_message": result["error_message"]
             }
         except Exception as e:
             return {"status": "FAILURE", "error_message": str(e)}

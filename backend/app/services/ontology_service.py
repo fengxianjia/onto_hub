@@ -134,48 +134,36 @@ class OntologyService:
         
         return package
 
-    def list_ontologies(self, skip: int = 0, limit: int = 100, name: str = None, code: str = None, all_versions: bool = False):
-        packages = self.onto_repo.list_packages(skip, limit, name, code, all_versions)
+    def list_ontologies(self, skip: int = 0, limit: int = 100, name: str = None, code: str = None, all_versions: bool = False) -> schemas.PaginatedOntologyResponse:
+        packages, total = self.onto_repo.list_packages(skip, limit, name, code, all_versions)
         
-        # Convert to Pydantic models immediately to ensure we can modify fields
-        results = [schemas.OntologyPackageResponse.model_validate(pkg) for pkg in packages]
+        results = []
+        for pkg in packages:
+             # Convert to Pydantic model
+             res_item = schemas.OntologyPackageResponse.model_validate(pkg)
+             self._enrich_package_security_info(res_item)
+             results.append(res_item)
+             
+        return {"items": results, "total": total}
 
-        # 如果查询的是版本列表，需要增加安全性标记
-        if (name or code) and all_versions:
-            # We use code for filter now ideally
-            target_filter = code if code else None 
-            # If code is missing but name is present, we might be in trouble if we enforce code strictness here.
-            # Ideally frontend passes code.
-            
-            in_use_ids = []
-            if target_filter:
-                 in_use_ids = self.webhook_service.get_in_use_package_ids(target_filter)
-            # Webhook model has ontology_filter. Ideally this should match CODE now. 
-            # But let's keep it robust. If we changed ontology to have code, webhooks should probably filter by code too.
-            # For now, let's assume webhook filter matches what is stored in ontology_filter.
-            # Simplification: pass the package's name/code to check.
-            pass
+    def list_versions(self, code: str, skip: int = 0, limit: int = 100) -> schemas.PaginatedOntologyResponse:
+        # Specialized method for versions of a specific ontology
+        return self.list_ontologies(skip, limit, code=code, all_versions=True)
 
-            for pkg in results:
-                # Re-query in-use for each package because they might share name/code
-                # Actually get_in_use_package_ids might need refactoring too.
-                # Let's do it per-package validation for accuracy
-                if pkg.is_active:
-                    pkg.is_deletable = False
-                    pkg.deletable_reason = "当前版本已启用"
-                else:
-                    # Check if this specific package ID is in use
-                     # TODO: Webhook logic needs to be aligned with Code/Name.
-                     # For now, let's skip the expensive batch check and do lazy check or assume Repository handles it.
-                     pass
-                     # Restoration of original logic adapted:
-                     if pkg.id in in_use_ids:
-                        pkg.is_deletable = False
-                        pkg.deletable_reason = "该版本正在 Webhook 订阅中使用"
-                     else:
-                        pkg.is_deletable = True
-                        pkg.deletable_reason = None
-        return results
+    def _enrich_package_security_info(self, pkg: schemas.OntologyPackageResponse):
+        if pkg.is_active:
+            pkg.is_deletable = False
+            pkg.deletable_reason = "当前版本已启用"
+        else:
+             # This check might be expensive if done individually for a large list, 
+             # but for now it's acceptable.
+             in_use_ids = self.webhook_service.get_in_use_package_ids(pkg.code)
+             if pkg.id in in_use_ids:
+                pkg.is_deletable = False
+                pkg.deletable_reason = "该版本正在 Webhook 订阅中使用"
+             else:
+                pkg.is_deletable = True
+                pkg.deletable_reason = None
 
     def get_ontology_detail(self, package_id: str):
         package = self.onto_repo.get_package(package_id)

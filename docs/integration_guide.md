@@ -18,9 +18,11 @@ from app.sdk import OntologySDK
 ### 获取列表
 
 ```python
-packages = OntologySDK.get_ontologies()
+# 需要传入 API 地址
+result = OntologySDK.get_ontologies("http://127.0.0.1:8003")
+packages = result['items']
 for pkg in packages:
-    print(pkg.name, pkg.id)
+    print(pkg['name'], pkg['id'])
 ```
 
 ### 读取 MD 文件内容
@@ -90,9 +92,15 @@ client = OntologyClient("http://ontology-service:8000")
 result = client.upload_ontology("./my_ontology.zip", code="auth-module", name="认证模块")
 print(f"Created Series: {result['code']} v{result['version']}")
 
-# 2. 上传新版本
+# 2. 上传新版本 (自动识别为添加版本)
 result = client.upload_ontology("./my_ontology_v2.zip", code="auth-module")
 print(f"Added Version: {result['code']} v{result['version']}")
+
+# 3. 获取列表 (分页)
+result = client.get_ontologies(skip=0, limit=10)
+print(f"Total Series: {result['total']}")
+for item in result['items']:
+    print(item['name'])
 
 # 2. 读取文件
 content = client.get_file_content(result['id'], "summary.md")

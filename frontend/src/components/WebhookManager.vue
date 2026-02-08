@@ -88,6 +88,18 @@
           </tbody>
         </table>
       </div>
+      
+      <!-- Pagination -->
+      <div v-if="tableData.length" class="mt-4 border-t pt-4">
+        <Pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :disabled="loading"
+          @change="handlePageChange"
+          @update:page-size="handlePageChange"
+        />
+      </div>
     </Card>
 
     <!-- Create/Edit Dialog -->
@@ -141,9 +153,14 @@
     <WebhookLogDrawer 
       v-model="logDrawerVisible" 
       :webhook-id="currentWebhookId"
+      :webhook-name="currentWebhookName"
       :logs-data="logsData" 
-      :loading="logsLoading" 
+      :loading="logsLoading"
+      :total="logsPagination.total"
+      :current-page="logsPagination.currentPage"
+      :page-size="logsPagination.pageSize"
       @refresh="fetchLogs"
+      @page-change="fetchLogs"
     />
   </div>
 </template>
@@ -151,7 +168,7 @@
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue'
 import axios from 'axios'
-import { Card, Button, Badge, Dialog, Input, Select, Loading, Empty } from './index.js'
+import { Card, Button, Badge, Dialog, Input, Select, Loading, Empty, Pagination } from './index.js'
 import WebhookLogDrawer from './WebhookLogDrawer.vue'
 import { showMessage, showConfirm } from '../utils/message.js'
 
@@ -164,11 +181,23 @@ const submitting = ref(false)
 const isEdit = ref(false)
 const currentId = ref(null)
 
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0
+})
+
 // 日志相关
 const logDrawerVisible = ref(false)
 const logsData = ref([])
 const logsLoading = ref(false)
 const currentWebhookId = ref(null)
+const currentWebhookName = ref('')
+const logsPagination = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0
+})
 
 const form = reactive({
   name: '',
@@ -214,14 +243,26 @@ const fetchOntologyOptions = async () => {
 const fetchWebhooks = async () => {
   loading.value = true
   try {
-    const res = await axios.get('/api/webhooks')
-    tableData.value = res.data
+    const skip = (pagination.currentPage - 1) * pagination.pageSize
+    const res = await axios.get('/api/webhooks', {
+      params: {
+        skip,
+        limit: pagination.pageSize
+      }
+    })
+    // Backend now returns { items: [], total: int }
+    tableData.value = res.data.items
+    pagination.total = res.data.total
     emit('change')
   } catch (error) {
     showMessage('获取订阅列表失败', 'error')
   } finally {
     loading.value = false
   }
+}
+
+const handlePageChange = () => {
+  fetchWebhooks()
 }
 
 const handleAdd = () => {
@@ -264,17 +305,36 @@ const handleDelete = async (row) => {
 
 const handleLogs = (row) => {
   currentWebhookId.value = row.id
+  currentWebhookName.value = row.name
   logDrawerVisible.value = true
   logsData.value = []
+  logsPagination.currentPage = 1
+  logsPagination.total = 0
   fetchLogs()
 }
 
-const fetchLogs = async () => {
+const fetchLogs = async (filters = {}) => {
   if (!currentWebhookId.value) return
+  
+  if (filters.page) {
+    logsPagination.currentPage = filters.page
+    logsPagination.pageSize = filters.pageSize
+    delete filters.page
+    delete filters.pageSize
+  }
+
   logsLoading.value = true
   try {
-    const res = await axios.get(`/api/webhooks/${currentWebhookId.value}/logs`)
-    logsData.value = res.data
+    const params = {}
+    if (filters.ontology) params.ontology_name = filters.ontology
+    if (filters.status) params.status = filters.status
+    
+    params.skip = (logsPagination.currentPage - 1) * logsPagination.pageSize
+    params.limit = logsPagination.pageSize
+
+    const res = await axios.get(`/api/webhooks/${currentWebhookId.value}/logs`, { params })
+    logsData.value = res.data.items
+    logsPagination.total = res.data.total
   } catch (e) {
     showMessage('获取日志失败', 'error')
   } finally {

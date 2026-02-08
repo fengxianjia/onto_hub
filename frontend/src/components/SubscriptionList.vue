@@ -94,7 +94,7 @@
             <Button
               variant="ghost"
               size="sm"
-              @click="viewHistory(sub.webhook_id)"
+              @click="viewHistory(sub.webhook_id, sub.webhook_name)"
             >
               推送历史
             </Button>
@@ -111,14 +111,30 @@
         </div>
       </div>
     </div>
+    <!-- Log Drawer -->
+    <WebhookLogDrawer
+      v-model="logDrawerVisible"
+      :webhook-id="currentWebhookId"
+      :webhook-name="currentWebhookName"
+      :logs-data="logsData"
+      :loading="logsLoading"
+      :show-ontology-filter="false"
+      :total="logsPagination.total"
+      :current-page="logsPagination.currentPage"
+      :page-size="logsPagination.pageSize"
+      @refresh="fetchLogs"
+      @page-change="fetchLogs"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, reactive } from 'vue'
 import axios from 'axios'
 import { Button, Badge, Loading, Empty } from './index.js'
 import { message, showConfirm } from '../utils/message.js'
+
+import WebhookLogDrawer from './WebhookLogDrawer.vue'
 
 const props = defineProps({
   ontologyCode: String,
@@ -132,6 +148,18 @@ const subscriptions = ref([])
 const loading = ref(false)
 const refreshing = ref(false)
 const pushing = ref(null)
+
+// History Log State
+const logDrawerVisible = ref(false)
+const logsData = ref([])
+const logsLoading = ref(false)
+const currentWebhookId = ref(null)
+const currentWebhookName = ref('')
+const logsPagination = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0
+})
 
 // 获取订阅列表
 // 使用 /api/ontologies/{code}/subscriptions
@@ -158,6 +186,54 @@ const fetchSubscriptions = async (isRefresh = false) => {
   }
 }
 
+// 获取日志
+const fetchLogs = async (webhookId, filters = {}) => {
+  let targetWebhookId = currentWebhookId.value
+  let activeFilters = {}
+
+  if (typeof webhookId === 'object') {
+     activeFilters = webhookId
+  } else if (webhookId) {
+     targetWebhookId = webhookId
+     activeFilters = filters
+  }
+
+  if (!targetWebhookId) return
+  
+  if (activeFilters.page) {
+    logsPagination.currentPage = activeFilters.page
+    logsPagination.pageSize = activeFilters.pageSize
+    delete activeFilters.page
+    delete activeFilters.pageSize
+  }
+
+  logsLoading.value = true
+  try {
+    const params = { 
+      ontology_name: props.ontologyCode, 
+      ...activeFilters 
+    }
+    params.ontology_name = props.ontologyCode
+
+    if (activeFilters.status) {
+        params.status = activeFilters.status
+    }
+    
+    params.skip = (logsPagination.currentPage - 1) * logsPagination.pageSize
+    params.limit = logsPagination.pageSize
+
+    const res = await axios.get(`/api/webhooks/${targetWebhookId}/logs`, {
+      params
+    })
+    logsData.value = res.data.items
+    logsPagination.total = res.data.total
+  } catch (e) {
+    message.error('获取日志失败')
+  } finally {
+    logsLoading.value = false
+  }
+}
+
 // 手动推送 - 使用激活接口重新激活最新版本
 const manualPush = async (sub) => {
   const webhookId = sub.webhook_id
@@ -168,13 +244,15 @@ const manualPush = async (sub) => {
 
     if (!targetPackageId) {
       // 如果没有传递具体包ID，则默认获取最新版本 (兼容旧逻辑)
-      const packages = await axios.get(`/api/ontologies`, {
+      const packagesRes = await axios.get(`/api/ontologies`, {
         params: { code: props.ontologyCode, limit: 1 }
       })
       
-      if (packages.data && packages.data.length > 0) {
-        targetPackageId = packages.data[0].id
-        targetVersion = packages.data[0].version
+      const packages = packagesRes.data.items || []
+      
+      if (packages.length > 0) {
+        targetPackageId = packages[0].id
+        targetVersion = packages[0].version
       }
     }
     
@@ -220,9 +298,13 @@ const manualPush = async (sub) => {
 }
 
 // 查看推送历史
-const viewHistory = (webhookId) => {
-  // TODO: 实现推送历史查看功能
-  message.info('推送历史功能开发中')
+const viewHistory = (webhookId, webhookName = '') => {
+  currentWebhookId.value = webhookId
+  currentWebhookName.value = webhookName
+  logsPagination.currentPage = 1
+  logsPagination.total = 0
+  logDrawerVisible.value = true
+  fetchLogs(webhookId)
 }
 
 // 格式化时间

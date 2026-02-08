@@ -40,7 +40,7 @@ class OntologyRepository:
             models.OntologyPackage.code == code
         ).order_by(models.OntologyPackage.version.desc()).first()
 
-    def list_packages(self, skip: int = 0, limit: int = 100, name: str = None, code: str = None, all_versions: bool = False) -> List[models.OntologyPackage]:
+    def list_packages(self, skip: int = 0, limit: int = 100, name: str = None, code: str = None, all_versions: bool = False) -> Tuple[List[models.OntologyPackage], int]:
         query = self.db.query(models.OntologyPackage)
         if name:
             query = query.filter(models.OntologyPackage.name.contains(name)) # Fuzzy search for name
@@ -53,7 +53,9 @@ class OntologyRepository:
             # Let's stick to the current logic in manager.py
             query = query.filter(models.OntologyPackage.is_active == True)
             
-        return query.order_by(models.OntologyPackage.upload_time.desc()).offset(skip).limit(limit).all()
+        total = query.count()
+        items = query.order_by(models.OntologyPackage.upload_time.desc()).offset(skip).limit(limit).all()
+        return items, total
 
     def delete_package(self, package_id: str):
         package = self.get_package(package_id)

@@ -135,7 +135,7 @@ def create_webhook(
 ):
     return service.create_webhook(webhook)
 
-@app.get("/api/webhooks", response_model=List[schemas.WebhookResponse])
+@app.get("/api/webhooks", response_model=schemas.PaginatedWebhookResponse)
 def list_webhooks(
     skip: int = 0, 
     limit: int = 100,
@@ -159,14 +159,16 @@ def update_webhook(
 ):
     return service.update_webhook(id, webhook)
 
-@app.get("/api/webhooks/{id}/logs", response_model=List[schemas.WebhookDeliveryResponse])
+@app.get("/api/webhooks/{id}/logs", response_model=schemas.PaginatedWebhookDeliveryResponse)
 def get_webhook_logs(
     id: str,
+    ontology_name: str = Query(None, description="按本体编码/名称过滤"),
+    status: str = Query(None, description="按状态过滤 (SUCCESS/FAILURE)"),
     skip: int = 0,
     limit: int = 20,
     service: WebhookService = Depends(get_webhook_service)
 ):
-    return service.get_logs_by_webhook(id, skip, limit)
+    return service.get_logs_by_webhook(id, ontology_name, status, skip, limit)
 
 @app.post("/api/webhooks/{id}/ping")
 async def ping_webhook(
@@ -175,16 +177,26 @@ async def ping_webhook(
 ):
     return await service.ping_webhook(id)
 
-@app.get("/api/ontologies", response_model=List[schemas.OntologyPackageResponse])
+@app.get("/api/ontologies", response_model=schemas.PaginatedOntologyResponse)
 def get_ontologies(
     skip: int = 0, 
     limit: int = 100, 
     name: str = None,
     code: str = None,
-    all_versions: bool = False,
+    # all_versions is deprecated for this endpoint, it now serves Series List (active/latest)
     service: OntologyService = Depends(get_ontology_service)
 ):
-    return service.list_ontologies(skip, limit, name, code, all_versions)
+    return service.list_ontologies(skip, limit, name, code, all_versions=False)
+
+@app.get("/api/ontologies/{code}/versions", response_model=schemas.PaginatedOntologyResponse)
+def get_ontology_versions(
+    code: str,
+    skip: int = 0,
+    limit: int = 100,
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """获取指定本体的所有历史版本"""
+    return service.list_versions(code, skip, limit)
 
 @app.post("/api/ontologies/{id}/activate")
 def activate_ontology(

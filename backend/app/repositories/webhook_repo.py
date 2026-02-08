@@ -32,8 +32,11 @@ class WebhookRepository:
     def get_webhook(self, webhook_id: str) -> Optional[models.Webhook]:
         return self.db.query(models.Webhook).filter(models.Webhook.id == webhook_id).first()
 
-    def list_webhooks(self, skip: int = 0, limit: int = 100) -> List[models.Webhook]:
-        return self.db.query(models.Webhook).offset(skip).limit(limit).all()
+    def list_webhooks(self, skip: int = 0, limit: int = 100) -> Tuple[List[models.Webhook], int]:
+        query = self.db.query(models.Webhook)
+        total = query.count()
+        items = query.offset(skip).limit(limit).all()
+        return items, total
 
     def delete_webhook(self, webhook_id: str):
         webhook = self.get_webhook(webhook_id)
@@ -108,11 +111,21 @@ class WebhookRepository:
             .order_by(desc(models.WebhookDelivery.created_at))\
             .offset(skip).limit(limit).all()
 
-    def get_logs_by_webhook(self, webhook_id: str, skip: int = 0, limit: int = 20) -> List[models.WebhookDelivery]:
-        return self.db.query(models.WebhookDelivery)\
-            .filter(models.WebhookDelivery.webhook_id == webhook_id)\
-            .order_by(desc(models.WebhookDelivery.created_at))\
+    def get_logs_by_webhook(self, webhook_id: str, ontology_name: str = None, status: str = None, skip: int = 0, limit: int = 20) -> Tuple[List[Tuple[models.WebhookDelivery, str]], int]:
+        query = self.db.query(models.WebhookDelivery, models.Webhook.name)\
+            .join(models.Webhook, models.WebhookDelivery.webhook_id == models.Webhook.id)\
+            .filter(models.WebhookDelivery.webhook_id == webhook_id)
+        
+        if ontology_name:
+             query = query.filter(models.WebhookDelivery.ontology_name.contains(ontology_name))
+        
+        if status:
+            query = query.filter(models.WebhookDelivery.status == status)
+             
+        total = query.count()
+        items = query.order_by(desc(models.WebhookDelivery.created_at))\
             .offset(skip).limit(limit).all()
+        return items, total
 
     def get_latest_success_delivery(self, webhook_id: str, ontology_name: str) -> Optional[models.WebhookDelivery]:
         return self.db.query(models.WebhookDelivery)\

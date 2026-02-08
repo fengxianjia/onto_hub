@@ -127,6 +127,25 @@
           对比选中的版本 (v{{ selectedVersions[0].version }} vs v{{ selectedVersions[1].version }})
         </Button>
       </div>
+      <!-- Compare Selected Button (Floating) -->
+      <div v-if="selectedVersions.length === 2" class="sticky bottom-4 flex justify-center">
+        <Button variant="primary" size="lg" @click="handleCompareSelected" class="shadow-lg">
+          对比选中的版本 (v{{ selectedVersions[0].version }} vs v{{ selectedVersions[1].version }})
+        </Button>
+      </div>
+      
+      <!-- Pagination -->
+      <div v-if="versions.length" class="mt-4 flex justify-center pb-4">
+        <Pagination
+            v-model:current-page="pagination.currentPage"
+            v-model:page-size="pagination.pageSize"
+            :total="pagination.total"
+            :disabled="loading"
+            @change="handlePageChange"
+            @update:page-size="handlePageChange"
+            layout="prev, pager, next" 
+        />
+      </div>
     </div>
 
     <template #footer>
@@ -147,9 +166,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, reactive } from 'vue'
 import axios from 'axios'
-import { Drawer, Card, Badge, Button, Loading, Empty } from './index.js'
+import { Drawer, Card, Badge, Button, Loading, Empty, Pagination } from './index.js'
 import DeliveryStatusDialog from './DeliveryStatusDialog.vue'
 import { message, showConfirm } from '../utils/message.js'
 
@@ -322,24 +341,38 @@ const handleCompareSelected = () => {
   }
 }
 
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0
+})
+
 const fetchVersions = async () => {
-  if (!props.ontologyName) return
+  if (!props.ontologyCode) return
   
   loading.value = true
   try {
-    const res = await axios.get(`/api/ontologies`, {
+    const skip = (pagination.currentPage - 1) * pagination.pageSize
+    const res = await axios.get(`/api/ontologies/${props.ontologyCode}/versions`, {
       params: {
-        name: props.ontologyName,
-        all_versions: true
+        skip,
+        limit: pagination.pageSize
       }
     })
-    // Sort by version descending
-    versions.value = res.data.sort((a, b) => b.version - a.version)
+    // Sort by version descending (backend already sorts by upload_time desc, but let's trust backend or ensure sort)
+    // Backend `list_versions` calls `list_packages` which orders by `upload_time` desc.
+    // So items are already sorted.
+    versions.value = res.data.items
+    pagination.total = res.data.total
   } catch (error) {
     showMessage('获取版本历史失败', 'error')
   } finally {
     loading.value = false
   }
+}
+
+const handlePageChange = () => {
+    fetchVersions()
 }
 
 const handleViewDetail = (version) => {

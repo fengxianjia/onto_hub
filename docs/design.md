@@ -75,8 +75,8 @@ graph TB
     *   `ACTIVE`: 当前生效的主版本 (同一 `name` 只能有一个 Active 版本)。
     *   `DEPRECATED`: 历史版本，可读但不可变更。
 *   **API 行为**:
-    *   `GET /api/ontologies`: 默认只返回 `is_active=True` 的版本（最新版）。
-    *   `GET /api/ontologies?all_versions=true`: 返回所有历史版本。
+    *   `GET /api/ontologies`: 分页返回**本体系列列表** (Series List)，每项包含最新版本信息。
+    *   `GET /api/ontologies/{code}/versions`: 分页返回指定本体系列的**所有历史版本**。
 
 ### 3.2 不可变基础设施与删除约束 (Deletion Constraints)
 为了保障下游系统的稳定性，系统实施了严格的**删除保护策略**：

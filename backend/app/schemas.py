@@ -42,6 +42,10 @@ class OntologyPackageResponse(OntologyPackageBase):
 class OntologyPackageDetailResponse(OntologyPackageResponse):
     files: List[OntologyFileResponse] = []
 
+class PaginatedOntologyResponse(BaseModel):
+    items: List[OntologyPackageResponse]
+    total: int
+
 class WebhookBase(BaseModel):
     name: Optional[str] = "Webhook"
     target_url: str
@@ -59,6 +63,11 @@ class WebhookResponse(WebhookBase):
     class Config:
         from_attributes = True
 
+
+class PaginatedWebhookResponse(BaseModel):
+    items: List[WebhookResponse]
+    total: int
+
 class WebhookDeliveryResponse(BaseModel):
     id: str
     webhook_id: str
@@ -73,6 +82,10 @@ class WebhookDeliveryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PaginatedWebhookDeliveryResponse(BaseModel):
+    items: List[WebhookDeliveryResponse]
+    total: int
 
 class FileDiff(BaseModel):
     file_path: str

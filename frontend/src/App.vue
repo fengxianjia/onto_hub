@@ -90,6 +90,18 @@
               </table>
             </div>
           </Card>
+          
+          <!-- Pagination -->
+          <div v-if="tableData.length" class="flex justify-center">
+            <Pagination
+              v-model:current-page="pagination.currentPage"
+              v-model:page-size="pagination.pageSize"
+              :total="pagination.total"
+              :disabled="loading"
+              @change="handlePageChange"
+              @update:page-size="handlePageChange"
+            />
+          </div>
         </div>
         
         <!-- 订阅设置 Tab -->
@@ -202,7 +214,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { Header, Container } from './components/index.js'
-import { Button, Card, Input, Select, Upload, Badge, Empty, Loading, Dialog } from './components/index.js'
+import { Button, Card, Input, Select, Upload, Badge, Empty, Loading, Dialog, Pagination } from './components/index.js'
 import WebhookManager from './components/WebhookManager.vue'
 import OntologyDetailDialog from './components/OntologyDetailDialog.vue'
 import SubscriptionList from './components/SubscriptionList.vue'
@@ -236,6 +248,11 @@ const newUploadRef = ref(null)
 // Table Data
 const tableData = ref([])
 const loading = ref(false)
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0
+})
 
 // Dialog and Drawer states
 const pushStatusDialog = ref({
@@ -348,13 +365,24 @@ const submitNewOntology = async () => {
 const fetchOntologies = async () => {
   loading.value = true
   try {
-    const res = await axios.get('/api/ontologies')
-    tableData.value = res.data
+    const skip = (pagination.currentPage - 1) * pagination.pageSize
+    const res = await axios.get('/api/ontologies', {
+        params: {
+            skip,
+            limit: pagination.pageSize
+        }
+    })
+    tableData.value = res.data.items
+    pagination.total = res.data.total
   } catch (error) {
     showMessage('获取列表失败', 'error')
   } finally {
     loading.value = false
   }
+}
+
+const handlePageChange = () => {
+    fetchOntologies()
 }
 
 const handleView = (row) => {
