@@ -82,7 +82,6 @@ logs/
 repro_request.py
 migrate_*.py
 debug_schema.py
-client.py
 test_*.py
 
 # Uploaded files
