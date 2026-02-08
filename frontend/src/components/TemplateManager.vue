@@ -1,25 +1,29 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 animate-slideUp">
     <!-- Header -->
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-bold text-foreground">解析模板管理</h2>
-      <Button variant="primary" size="sm" @click="openDialog()">
-        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        新建模板
-      </Button>
-    </div>
-
-    <!-- Usage Guide Toggle -->
-    <div class="flex justify-end">
-      <Button variant="ghost" size="sm" @click="showGuide = !showGuide" class="text-muted-foreground hover:text-foreground">
-        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        {{ showGuide ? '隐藏配置指南' : '显示配置指南' }}
-      </Button>
-    </div>
+    <Card variant="flat" class="mb-0 overflow-visible">
+      <div class="flex justify-between items-center py-2 px-1">
+        <h2 class="text-2xl font-bold text-foreground">解析模板管理</h2>
+        <div class="flex gap-3">
+          <Button variant="ghost" size="sm" @click="fetchTemplates" title="刷新">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </Button>
+          <Button variant="ghost" size="sm" @click="showGuide = !showGuide" :class="['transition-colors', showGuide ? 'text-accent bg-accent/10' : 'text-muted-foreground hover:text-foreground']" title="配置指南">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </Button>
+          <Button variant="primary" size="sm" @click="openDialog()">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            新建模板
+          </Button>
+        </div>
+      </div>
+    </Card>
 
     <!-- Usage Guide -->
     <Card v-if="showGuide" variant="flat" class="bg-muted/30 border-dashed border-2 animate-in fade-in slide-in-from-top-2">

@@ -19,30 +19,29 @@
         </div>
         
         <!-- 本体库管理 Tab -->
-        <div v-if="activeTab === 'ontology'" class="space-y-8">
-          <!-- Upload Card -->
-
+        <div v-if="activeTab === 'ontology'" class="space-y-8 animate-slideUp">
+          <!-- Header Area -->
+          <Card variant="flat" class="mb-0 overflow-visible">
+            <div class="flex justify-between items-center py-2 px-1">
+              <h3 class="text-2xl font-bold text-foreground">本体列表</h3>
+              <div class="flex gap-3">
+                <Button variant="ghost" size="sm" @click="fetchOntologies" title="刷新">
+                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </Button>
+                <Button variant="primary" size="sm" @click="openUploadDialog">
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  新建本体
+                </Button>
+              </div>
+            </div>
+          </Card>
           
           <!-- Ontology List Card -->
           <Card class="shadow-xl" variant="elevated">
-            <template #header>
-              <div class="flex items-center justify-between">
-                <h3 class="text-2xl font-bold text-foreground">本体列表</h3>
-                <div class="flex gap-2">
-                  <Button variant="primary" size="sm" @click="openUploadDialog">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    新建本体
-                  </Button>
-                  <Button variant="ghost" size="sm" @click="fetchOntologies">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </Button>
-                </div>
-              </div>
-            </template>
             
             <div v-if="loading" class="flex justify-center py-12">
               <Loading />

@@ -1,19 +1,21 @@
 <template>
   <div class="space-y-8 animate-slideUp">
-    <Card class="shadow-xl" variant="elevated">
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h3 class="text-2xl font-bold text-foreground">订阅管理 (Webhooks)</h3>
-          <div class="flex gap-3">
-            <Button variant="ghost" size="sm" @click="fetchWebhooks">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </Button>
-            <Button variant="primary" @click="handleAdd">新增订阅</Button>
-          </div>
+    <!-- Header -->
+    <Card variant="flat" class="mb-0 overflow-visible">
+      <div class="flex justify-between items-center py-2 px-1">
+        <h3 class="text-2xl font-bold text-foreground">订阅管理 (Webhooks)</h3>
+        <div class="flex gap-3">
+          <Button variant="ghost" size="sm" @click="fetchWebhooks" title="刷新">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </Button>
+          <Button variant="primary" size="sm" @click="handleAdd">新增订阅</Button>
         </div>
-      </template>
+      </div>
+    </Card>
+
+    <Card class="shadow-xl" variant="elevated">
 
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-20">

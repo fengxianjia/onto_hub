@@ -3,7 +3,7 @@ import logging
 import logging.config
 from typing import Dict, Any
 
-from .config import settings
+from ..config import settings
 
 # 日志存储目录
 LOG_DIR = settings.LOG_DIR
