@@ -11,25 +11,23 @@ class Settings(BaseSettings):
     ENV: str = "development"
     
     # Paths
-    BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # config.py is at backend/app/config.py
+    # BASE_DIR should be backend/
+    _current_file = os.path.abspath(__file__)
+    BASE_DIR: str = os.path.dirname(os.path.dirname(_current_file))
     
     # Database
-    DATABASE_URL: str = "sqlite:///./ontohub.db"
+    # Use absolute path for SQLite to prevent it from moving with CWD
+    DATABASE_URL: str = f"sqlite:///{os.path.join(BASE_DIR, 'ontohub.db')}"
     
     # Storage
-    # Default to 'backend/data/ontohub_storage' relative to BASE_DIR if not provided
-    STORAGE_DIR: str = os.path.join(
-        os.path.dirname(BASE_DIR), # backend/
-        "data", 
-        "ontohub_storage"
-    )
+    # Default to 'backend/data/ontohub_storage' inside BASE_DIR
+    STORAGE_DIR: str = os.path.join(BASE_DIR, "data", "ontohub_storage")
 
     # Logging
+    # Default to 'backend/logs' inside BASE_DIR
     LOG_LEVEL: str = "INFO"
-    LOG_DIR: str = os.path.join(
-        os.path.dirname(BASE_DIR), # backend/
-        "logs"
-    )
+    LOG_DIR: str = os.path.join(BASE_DIR, "logs")
 
     # CORS
     CORS_ORIGINS: List[str] = ["*"]

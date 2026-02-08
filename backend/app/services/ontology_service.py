@@ -47,7 +47,7 @@ class OntologyService:
 
     async def create_ontology(self, file: UploadFile, code: str, custom_id: str = None, name: str = None, template_id: str = None) -> models.OntologyPackage:
         # Simplified process based on manager.py
-        temp_zip = f"temp_{datetime.now().timestamp()}.zip"
+        temp_zip = os.path.join(BASE_STORAGE_DIR, f"temp_{datetime.now().timestamp()}.zip")
         async with aiofiles.open(temp_zip, 'wb') as out_file:
             content = await file.read()
             await out_file.write(content)

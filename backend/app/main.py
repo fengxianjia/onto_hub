@@ -7,28 +7,35 @@ from typing import List
 import os
 from datetime import datetime
 
-from . import models, schemas, database, utils
 from .config import settings
+from .core.logging import setup_logging
+
+# 立即初始化统一日志，必须在导入其他业务模块之前，确保所有 module-level logger 正确继承配置
+setup_logging()
+
+from . import models, schemas, database, utils
+
+# 确保所有模型已加载，并自动创建数据库表 (如果不存在)
+# 这一步必须在任何数据库查询发生之前执行
+models.Base.metadata.create_all(bind=database.engine)
 from .repositories.ontology_repo import OntologyRepository
 from .repositories.webhook_repo import WebhookRepository
 from .services.ontology_service import OntologyService
 from .services.webhook_service import WebhookService
 from .tasks import parse_ontology_task
-from .core.logging import setup_logging
 from .core.middleware import LoggingMiddleware
 from .routers import templates
-
-# 初始化统一日志
-setup_logging()
-
-# 自动创建数据库表
-models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="专业级的本体管理枢纽 - 支持版本控制、异步推送与解耦架构",
     version=settings.APP_VERSION
 )
+
+@app.on_event("startup")
+async def startup_event():
+    import logging
+    logging.info("FastAPI application is starting up...")
 
 # 注册路由
 app.include_router(templates.router)
