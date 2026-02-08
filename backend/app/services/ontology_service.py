@@ -217,6 +217,11 @@ class OntologyService:
         storage_path = self._get_storage_path(package_id)
         if os.path.exists(storage_path):
             shutil.rmtree(storage_path)
+            
+        # Delete source zip file
+        zip_path = self.get_source_zip_path(package_id)
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
 
     def get_source_zip_path(self, package_id: str) -> str:
         # This belongs more to a StorageService but we'll put it here for now
