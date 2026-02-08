@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model="visible" title="本体详情" width="1200px">
+  <Dialog v-model="visible" title="本体详情" width="90%">
     <!-- Loading State -->
     <div v-if="loading" class="flex items-center justify-center py-12">
       <Loading />
@@ -107,6 +107,21 @@
           :package-id="ontology.id"
         />
       </Card>
+
+      <!-- Tab Content: Graph -->
+      <div v-else-if="activeTab === 'graph'" class="h-[600px] border rounded-lg bg-white overflow-hidden">
+        <OntologyGraph :ontology-id="ontology.id" />
+      </div>
+
+      <!-- Tab Content: Entities -->
+      <Card v-else-if="activeTab === 'entities'" variant="default">
+         <EntityList :ontology-id="ontology.id" />
+      </Card>
+
+      <!-- Tab Content: Relations -->
+      <Card v-else-if="activeTab === 'relations'" variant="default">
+         <RelationList :ontology-id="ontology.id" />
+      </Card>
     </div>
 
     <template #footer>
@@ -136,7 +151,9 @@ import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import MarkdownIt from 'markdown-it'
 import 'github-markdown-css/github-markdown-light.css'
-import { Dialog, Card, Badge, Button, Empty, Loading } from './index.js'
+import { Dialog, Card, Badge, Button, Empty, Loading, RelationList } from './index.js'
+import OntologyGraph from './OntologyGraph.vue'
+import EntityList from './EntityList.vue'
 import FileTree from './FileTree.vue'
 import SubscriptionList from './SubscriptionList.vue'
 import DeliveryStatusDialog from './DeliveryStatusDialog.vue'
@@ -174,6 +191,9 @@ const currentPackageId = ref(null)
 // Tabs
 const tabs = [
   { label: '文件树', value: 'files' },
+  { label: '知识图谱', value: 'graph' },
+  { label: '实体列表', value: 'entities' },
+  { label: '关系列表', value: 'relations' },
   { label: '订阅服务', value: 'subscriptions' }
 ]
 const activeTab = ref('files')

@@ -16,6 +16,7 @@
     "github-markdown-css": "^5.9.0",
     "markdown-it": "^14.1.0",
     "v-code-diff": "^1.13.1",
+    "v-network-graph": "^0.9.22",
     "vue": "^3.5.24"
   },
   "devDependencies": {

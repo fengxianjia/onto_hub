@@ -154,8 +154,8 @@ class WebhookService:
         payload = {
             "event": "ontology.activated",
             "package_id": package.id,
-            "code": package.code,
-            "name": package.name,
+            "code": package.series_code,
+            "name": package.series.name,
             "version": package.version,
             "is_active": package.is_active,
             "timestamp": utils.time.time() # Or datetime.utcnow()
@@ -169,7 +169,7 @@ class WebhookService:
             "event_type": "ontology.activated",
             "file_path": file_path,
             "secret_token": webhook.secret_token,
-            "ontology_name": package.code # Use Code 
+            "ontology_name": package.series_code # Use Code 
         }
         
         if sync:
@@ -212,15 +212,15 @@ class WebhookService:
             results.append(item)
         return results
 
-    def get_in_use_package_ids(self, ontology_code: str) -> List[str]:
+    def get_in_use_package_ids(self, series_code: str) -> List[str]:
         """
         获取特定本体编码下正在被 Webhook 使用的包 ID 列表。
         正在使用指：在该 Webhook 下最后一次成功推送的版本。
         """
-        webhooks = self.repo.get_webhooks_by_event("ontology.activated", ontology_code=ontology_code)
+        webhooks = self.repo.get_webhooks_by_event("ontology.activated", ontology_code=series_code)
         in_use_ids = []
         for wh in webhooks:
-            latest = self.repo.get_latest_success_delivery(wh.id, ontology_code)
+            latest = self.repo.get_latest_success_delivery(wh.id, series_code)
             if latest and latest.payload:
                 try:
                     payload_data = json.loads(latest.payload)

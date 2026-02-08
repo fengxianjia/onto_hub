@@ -97,16 +97,27 @@ graph TB
 
 ## 4. 数据模型 (Data Design)
 
-### 4.1 OntologyPackage
+### 4.1 数据模型 (Data Design)
+#### 4.1.1 OntologySeries (本体系列)
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `id` | UUID | 全局唯一标识 |
-| `code` | String | 本体唯一编码 (Series ID) |
+| `code` | String | 本体唯一编码 (Business Key) |
 | `name` | String | 本体显示名称 |
+| `description` | Text | 全局描述 |
+| `default_template_id` | UUID | 默认解析模板ID |
+
+#### 4.1.2 OntologyPackage (本体版本)
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | UUID | 全局唯一标识 |
+| `series_code` | String | 所属系列编码 (FK) |
 | `version` | Integer | 版本号 (1, 2, 3...) |
 | `is_active` | Boolean | 是否为当前启用版本 |
-| `status` | String | READY, PROCESSING, ERROR |
-| `file_count` | Integer | 包内文件数量 |
+| `upload_time` | DateTime | 上传时间 |
+| `status` | String | 状态: UPLOADING, PROCESSING, READY, ERROR |
+| `error_msg` | Text | 错误信息 |
+| `template_id` | UUID | 此版本使用的解析模板ID |
 
 ### 4.2 Webhook
 | 字段 | 类型 | 说明 |

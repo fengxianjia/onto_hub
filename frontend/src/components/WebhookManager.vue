@@ -225,7 +225,8 @@ const fetchOntologyOptions = async () => {
     const res = await axios.get('/api/ontologies?all_versions=false') // Ensure we get unique codes effectively by listing active/latest
     // Map to Code + Name, ensure uniqueness by Code
     const uniqueMap = new Map()
-    res.data.forEach(item => {
+    const items = res.data.items || []
+    items.forEach(item => {
       if (!uniqueMap.has(item.code)) {
         uniqueMap.set(item.code, `${item.name} (${item.code})`)
       }

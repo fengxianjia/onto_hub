@@ -29,7 +29,7 @@
               <div class="flex items-center justify-between">
                 <h3 class="text-2xl font-bold text-foreground">本体列表</h3>
                 <div class="flex gap-2">
-                  <Button variant="primary" size="sm" @click="uploadDialogVisible = true">
+                  <Button variant="primary" size="sm" @click="openUploadDialog">
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
@@ -59,7 +59,7 @@
                     <th class="px-8 py-4 text-left text-base font-bold text-foreground">编码</th>
                     <th class="px-8 py-4 text-left text-base font-bold text-foreground">名称</th>
                     <th class="px-8 py-4 text-left text-base font-bold text-foreground">版本</th>
-                    <th class="px-8 py-4 text-left text-base font-bold text-foreground">状态</th>
+                    <th class="px-8 py-4 text-left text-base font-bold text-foreground">解析模板</th>
                     <th class="px-8 py-4 text-left text-base font-bold text-foreground">上传时间</th>
                     <th class="px-8 py-4 text-left text-base font-bold text-foreground">操作</th>
                   </tr>
@@ -75,7 +75,7 @@
                       <Badge variant="accent" size="lg">v{{ row.version }}</Badge>
                     </td>
                     <td class="px-8 py-5">
-                      <Badge :variant="getStatusVariant(row.status)" size="lg">{{ row.status }}</Badge>
+                      <span class="text-sm text-muted-foreground">{{ row.template_name || '-' }}</span>
                     </td>
                     <td class="px-8 py-5 text-sm text-muted-foreground">{{ formatDate(row.upload_time) }}</td>
                     <td class="px-8 py-5">
@@ -107,6 +107,11 @@
         <!-- 订阅设置 Tab -->
         <div v-if="activeTab === 'webhook'">
           <WebhookManager @change="fetchOntologies" />
+        </div>
+        
+        <!-- 解析模板 Tab -->
+        <div v-if="activeTab === 'templates'">
+          <TemplateManager />
         </div>
       </Container>
     </main>
@@ -184,6 +189,12 @@
             label="显示名称"
             placeholder="人类可读名称 (e.g. 认证模块)"
           />
+          <Select
+            v-model="newOntologyForm.templateId"
+            label="解析模板"
+            :options="templateOptions"
+            placeholder="选择解析模板 (可选)"
+          />
           <Upload
             ref="newUploadRef"
             label="文件"
@@ -216,6 +227,7 @@ import axios from 'axios'
 import { Header, Container } from './components/index.js'
 import { Button, Card, Input, Select, Upload, Badge, Empty, Loading, Dialog, Pagination } from './components/index.js'
 import WebhookManager from './components/WebhookManager.vue'
+import TemplateManager from './components/TemplateManager.vue'
 import OntologyDetailDialog from './components/OntologyDetailDialog.vue'
 import SubscriptionList from './components/SubscriptionList.vue'
 import VersionHistoryDrawer from './components/VersionHistoryDrawer.vue'
@@ -227,7 +239,8 @@ import { showMessage } from './utils/message.js'
 // Tabs
 const tabs = [
   { label: '本体库管理', value: 'ontology' },
-  { label: '订阅设置', value: 'webhook' }
+  { label: '订阅设置', value: 'webhook' },
+  { label: '解析模板', value: 'templates' }
 ]
 const activeTab = ref('ontology')
 
@@ -239,14 +252,25 @@ const newFileSelected = ref(false)
 // Forms
 const newOntologyForm = ref({
   code: '',
-  name: ''
+  name: '',
+  templateId: ''
 })
 
 // Refs
 const newUploadRef = ref(null)
 
+const fetchTemplates = async () => {
+  try {
+    const res = await axios.get('/api/templates/')
+    templates.value = res.data
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 // Table Data
 const tableData = ref([])
+const templates = ref([])
 const loading = ref(false)
 const pagination = reactive({
   currentPage: 1,
@@ -268,6 +292,7 @@ const compareDialogVisible = ref(false)
 const deliveryDialogVisible = ref(false)
 const selectedOntologyId = ref(null)
 const selectedOntologyName = ref('')
+const selectedOntologyCode = ref('')
 const selectedPackageId = ref(null)
 const compareVersions = reactive({ new: null, old: null })
 
@@ -285,7 +310,19 @@ const ontologyOptions = computed(() => {
   return Array.from(map.values())
 })
 
+const templateOptions = computed(() => {
+  return [
+    { label: '不解析 (仅上传)', value: '' },
+    ...templates.value.map(t => ({ label: t.name, value: t.id }))
+  ]
+})
+
 // Methods
+const openUploadDialog = () => {
+  fetchTemplates()
+  uploadDialogVisible.value = true
+}
+
 const tabClasses = (value) => {
   const base = 'px-8 py-4 text-base font-bold transition-all duration-300 border-b-4 cursor-pointer'
   return value === activeTab.value
@@ -332,6 +369,9 @@ const submitNewOntology = async () => {
   if (newOntologyForm.value.name) {
     formData.append('name', newOntologyForm.value.name)
   }
+  if (newOntologyForm.value.templateId) {
+    formData.append('template_id', newOntologyForm.value.templateId)
+  }
   
   try {
     const res = await axios.post('/api/ontologies', formData)
@@ -347,7 +387,7 @@ const submitNewOntology = async () => {
     }
     
     // Reset form
-    newOntologyForm.value = { code: '', name: '' }
+    newOntologyForm.value = { code: '', name: '', templateId: '' }
     newUploadRef.value?.clearFiles()
     newFileSelected.value = false
     uploadDialogVisible.value = false
@@ -408,6 +448,7 @@ const handleVersionUploadSuccess = (data) => {
 }
 
 const handleViewHistoryFromDetail = (ontology) => {
+  selectedOntologyCode.value = ontology.code
   selectedOntologyName.value = ontology.name
   detailDialogVisible.value = false
   historyDrawerVisible.value = true
@@ -427,7 +468,6 @@ const handleCompareFromHistory = ({ newVersion, oldVersion }) => {
 
 // Subscription Status View
 const subscriptionDialogVisible = ref(false)
-const selectedOntologyCode = ref('')
 
 const handleSubscriptionStatus = (row) => {
   selectedOntologyCode.value = row.code
@@ -438,5 +478,8 @@ const handleSubscriptionStatus = (row) => {
 // Lifecycle
 onMounted(() => {
   fetchOntologies()
+  axios.get('/api/templates/').then(res => {
+    templates.value = res.data
+  }).catch(console.error)
 })
 </script>

@@ -22,6 +22,7 @@ class OntologyPackageBase(BaseModel):
 
 class OntologyPackageCreate(OntologyPackageBase):
     description: Optional[str] = None
+    template_id: Optional[str] = None
 
 class OntologyPackageResponse(OntologyPackageBase):
     id: str
@@ -36,6 +37,9 @@ class OntologyPackageResponse(OntologyPackageBase):
     is_deletable: bool = True
     deletable_reason: Optional[str] = None
 
+    template_id: Optional[str] = None
+    template_name: Optional[str] = None
+    
     class Config:
         from_attributes = True
 
@@ -97,3 +101,50 @@ class OntologyComparisonResponse(BaseModel):
     base_version: int
     target_version: int
     files: List[FileDiff]
+
+class ParsingTemplateBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    rules: str # JSON string
+
+class ParsingTemplateCreate(ParsingTemplateBase):
+    pass
+
+class ParsingTemplateResponse(ParsingTemplateBase):
+    id: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class OntologyEntityResponse(BaseModel):
+    id: str
+    package_id: str
+    name: str
+    category: Optional[str] = None
+    metadata_json: Optional[str] = None
+    file_path: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class OntologyRelationResponse(BaseModel):
+    id: str
+    source_id: str
+    target_id: str
+    relation_type: str
+    
+    class Config:
+        from_attributes = True
+
+class OntologyGraphResponse(BaseModel):
+    nodes: List[OntologyEntityResponse]
+    links: List[OntologyRelationResponse]
+
+class OntologyRelationDetailResponse(OntologyRelationResponse):
+    source: OntologyEntityResponse
+    target: OntologyEntityResponse
+
+class PaginatedOntologyRelationResponse(BaseModel):
+    items: List[OntologyRelationDetailResponse]
+    total: int

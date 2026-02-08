@@ -11,7 +11,9 @@ from . import models, schemas, database, utils
 from .repositories.ontology_repo import OntologyRepository
 from .repositories.webhook_repo import WebhookRepository
 from .services.ontology_service import OntologyService
+from .services.ontology_service import OntologyService
 from .services.webhook_service import WebhookService
+from .tasks import parse_ontology_task
 
 # 自动创建数据库表
 models.Base.metadata.create_all(bind=database.engine)
@@ -55,26 +57,27 @@ async def create_ontology_series(
     code: str = Form(..., description="本体唯一编码 (Series ID)"),
     name: str = Form(None, description="显示名称"),
     custom_id: str = Form(None, description="自定义版本ID (Optional)"),
+    template_id: str = Form(None, description="解析模板 ID"),
     file: UploadFile = File(..., description="本体 ZIP 包"),
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
 ):
-    # Check if code exists (for V1 creation, we might want to enforce uniqueness or just allow overwrite if version 0?)
-    # For now, let's assume this endpoint is for "New Series" or "Idempotent Creation of V1".
-    # But wait, if code exists, create_ontology will just add V(Max+1). 
-    # The requirement is: 
-    # 1. Create New Ontology: Input Code -> V1. If Code exists, Error?
-    # 2. Add Version: Input Code (Select) -> V(Next).
-    
     # Check if series exists
     existing_version = service.onto_repo.get_latest_version(code)
     if existing_version > 0:
          raise HTTPException(status_code=400, detail=f"Ontology code '{code}' already exists. Use POST /api/ontologies/{code}/versions to add a new version.")
 
-    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=name)
+    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=name, template_id=template_id)
     
     # Broadcast Webhook
     _broadcast_activation(package, service, webhook_service, background_tasks)
+    
+    # Trigger Parsing Logic
+    # If template_id provided in form, use it.
+    # If not, use the one inherited/saved in package.
+    final_template_id = template_id or package.template_id
+    if final_template_id:
+        background_tasks.add_task(parse_ontology_task, package.id, final_template_id)
         
     return package
 
@@ -83,6 +86,7 @@ async def add_ontology_version(
     code: str,
     background_tasks: BackgroundTasks,
     custom_id: str = Form(None, description="自定义版本ID (Optional)"),
+    template_id: str = Form(None, description="解析模板 ID"),
     file: UploadFile = File(..., description="本体 ZIP 包"),
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
@@ -101,10 +105,17 @@ async def add_ontology_version(
     
     # Get latest package to reuse name?
     # The service.create_ontology allows name=None.
-    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=None)
+    # Get latest package to reuse name?
+    # The service.create_ontology allows name=None.
+    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=None, template_id=template_id)
     
     # Broadcast Webhook
     _broadcast_activation(package, service, webhook_service, background_tasks)
+    
+    # Trigger Parsing Logic
+    final_template_id = template_id or package.template_id
+    if final_template_id:
+        background_tasks.add_task(parse_ontology_task, package.id, final_template_id)
         
     return package
 
@@ -142,6 +153,10 @@ def list_webhooks(
     service: WebhookService = Depends(get_webhook_service)
 ):
     return service.get_webhooks(skip, limit)
+
+# Include Template Router
+from .routers import templates
+app.include_router(templates.router)
 
 @app.delete("/api/webhooks/{id}", status_code=204)
 def delete_webhook(
@@ -318,6 +333,46 @@ def read_ontology_file(
 ):
     content = service.get_file_content(id, path)
     return {"content": content}
+
+@app.get("/api/ontologies/{id}/graph", response_model=schemas.OntologyGraphResponse)
+def get_ontology_graph(
+    id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    **获取本体图谱数据**
+    """
+    entities = db.query(models.OntologyEntity).filter(models.OntologyEntity.package_id == id).all()
+    relations = db.query(models.OntologyRelation).filter(models.OntologyRelation.package_id == id).all()
+    
+    return {
+        "nodes": entities,
+        "links": relations
+    }
+
+@app.get("/api/ontologies/{id}/entities", response_model=List[schemas.OntologyEntityResponse])
+def get_ontology_entities(
+    id: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    **获取本体实体列表**
+    """
+    return db.query(models.OntologyEntity).filter(models.OntologyEntity.package_id == id).offset(skip).limit(limit).all()
+
+@app.get("/api/ontologies/{id}/relations", response_model=schemas.PaginatedOntologyRelationResponse)
+def get_ontology_relations(
+    id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """
+    **获取本体关系列表**
+    """
+    return service.list_relations(id, skip, limit)
 
 # Static Mounting Logic
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
