@@ -78,12 +78,6 @@ Thumbs.db
 *.log
 logs/
 
-# Test / Temporary Scripts
-repro_request.py
-migrate_*.py
-debug_schema.py
-test_*.py
-
 # Uploaded files
 *.zip
 
