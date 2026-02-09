@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -11,8 +11,7 @@ class OntologyFileResponse(OntologyFileBase):
     id: str
     package_id: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OntologyPackageBase(BaseModel):
     name: str
@@ -41,8 +40,7 @@ class OntologyPackageResponse(OntologyPackageBase):
     template_name: Optional[str] = None
     subscriber_count: Optional[int] = 0
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OntologySeriesUpdate(BaseModel):
     name: Optional[str] = None
@@ -73,8 +71,7 @@ class WebhookResponse(WebhookBase):
     id: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaginatedWebhookResponse(BaseModel):
@@ -93,8 +90,7 @@ class WebhookDeliveryResponse(BaseModel):
     error_message: str | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PaginatedWebhookDeliveryResponse(BaseModel):
     items: List[WebhookDeliveryResponse]
@@ -123,8 +119,7 @@ class ParsingTemplateResponse(ParsingTemplateBase):
     id: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OntologyEntityResponse(BaseModel):
     id: str
@@ -134,8 +129,7 @@ class OntologyEntityResponse(BaseModel):
     metadata_json: Optional[str] = None
     file_path: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OntologyRelationResponse(BaseModel):
     id: str
@@ -143,8 +137,7 @@ class OntologyRelationResponse(BaseModel):
     target_id: str
     relation_type: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OntologyGraphResponse(BaseModel):
     nodes: List[OntologyEntityResponse]
@@ -179,8 +172,7 @@ class UserResponse(UserBase):
     created_at: datetime
     last_login: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AuditLogResponse(BaseModel):
     id: str
@@ -191,5 +183,4 @@ class AuditLogResponse(BaseModel):
     created_at: datetime
     username: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

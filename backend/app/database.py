@@ -19,6 +19,8 @@ engine = create_engine(
 # autoflush=False: 禁止自动刷新，需要手动 flush
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+from sqlalchemy.orm import declarative_base
+
 # 声明基类，所有模型都继承自这个类
 Base = declarative_base()
 

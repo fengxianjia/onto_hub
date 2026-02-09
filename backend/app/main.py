@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from contextlib import asynccontextmanager
 from typing import List
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 
 from .config import settings
 from .core.logging import setup_logging
@@ -29,16 +30,18 @@ from .tasks import parse_ontology_task
 from .core.middleware import LoggingMiddleware
 from .routers import templates
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    import logging
+    logging.info("FastAPI application is starting up...")
+    yield
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="专业级的本体管理枢纽 - 支持版本控制、异步推送与解耦架构",
-    version=settings.APP_VERSION
+    version=settings.APP_VERSION,
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-async def startup_event():
-    import logging
-    logging.info("FastAPI application is starting up...")
 
 # 注册路由
 app.include_router(templates.router)
@@ -106,7 +109,7 @@ async def create_ontology_series(
         _broadcast_activation(package, service, webhook_service, background_tasks)
     
     # Set subscriber count for response
-    package_resp = schemas.OntologyPackageResponse.from_orm(package)
+    package_resp = schemas.OntologyPackageResponse.model_validate(package)
     package_resp.subscriber_count = subscriber_count
 
     # Trigger Parsing Logic
@@ -139,7 +142,7 @@ async def add_ontology_version(
         _broadcast_activation(package, service, webhook_service, background_tasks)
     
     # Set subscriber count for response
-    package_resp = schemas.OntologyPackageResponse.from_orm(package)
+    package_resp = schemas.OntologyPackageResponse.model_validate(package)
     package_resp.subscriber_count = subscriber_count
 
     # Trigger Parsing Logic
@@ -196,7 +199,7 @@ def _broadcast_activation(package, service, webhook_service, background_tasks):
         "version": package.version,
         "is_active": True,
         "is_uploaded": True,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
     
     webhook_service.broadcast_event(
@@ -300,7 +303,7 @@ def activate_ontology(
         "name": package.name,
         "version": package.version,
         "is_active": True,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
     
     webhook_service.broadcast_event(

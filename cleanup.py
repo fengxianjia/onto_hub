@@ -7,7 +7,7 @@ import sys
 # Windows console encoding fix
 sys.stdout.reconfigure(encoding='utf-8')
 
-DB_PATH = os.path.join("backend", "ontohub.db")
+DB_PATH = os.path.join("backend", "data","ontohub.db")
 STORAGE_PATH = os.path.join("backend", "data", "ontohub_storage")
 
 def kill_process_on_port(port):
