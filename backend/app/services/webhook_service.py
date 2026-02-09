@@ -1,9 +1,10 @@
 import logging
 import json
 from typing import List, Optional
-from fastapi import HTTPException
 from ..repositories.webhook_repo import WebhookRepository
 from .. import schemas, utils
+from ..core.results import ServiceResult, ServiceStatus
+from ..core.errors import BusinessCode
 
 logger = logging.getLogger(__name__)
 
@@ -11,8 +12,18 @@ class WebhookService:
     def __init__(self, repo: WebhookRepository):
         self.repo = repo
 
-    def create_webhook(self, webhook_in: schemas.WebhookCreate) -> schemas.WebhookResponse:
-        return self.repo.create_webhook(webhook_in)
+    def create_webhook(self, webhook_in: schemas.WebhookCreate) -> ServiceResult[schemas.WebhookResponse]:
+        if webhook_in.name:
+            existing = self.repo.get_webhook_by_name(webhook_in.name)
+            if existing:
+                return ServiceResult.failure_result(
+                    ServiceStatus.DUPLICATE_NAME, 
+                    f"Webhook name '{webhook_in.name}' already exists.",
+                    business_code=BusinessCode.WEBHOOK_NAME_DUPLICATE
+                )
+        
+        new_webhook = self.repo.create_webhook(webhook_in)
+        return ServiceResult.success_result(new_webhook)
 
     def get_webhooks(self, skip: int = 0, limit: int = 100) -> schemas.PaginatedWebhookResponse:
         items, total = self.repo.list_webhooks(skip, limit)
@@ -21,11 +32,24 @@ class WebhookService:
     def delete_webhook(self, webhook_id: str):
         self.repo.delete_webhook(webhook_id)
 
-    def update_webhook(self, webhook_id: str, update_in: schemas.WebhookCreate) -> schemas.WebhookResponse:
+    def update_webhook(self, webhook_id: str, update_in: schemas.WebhookCreate) -> ServiceResult[schemas.WebhookResponse]:
+        if update_in.name:
+            existing = self.repo.get_webhook_by_name(update_in.name)
+            if existing and str(existing.id) != webhook_id:
+                return ServiceResult.failure_result(
+                    ServiceStatus.DUPLICATE_NAME, 
+                    f"Webhook name '{update_in.name}' already exists.",
+                    business_code=BusinessCode.WEBHOOK_NAME_DUPLICATE
+                )
+
         webhook = self.repo.update_webhook(webhook_id, update_in)
         if not webhook:
-            raise HTTPException(status_code=404, detail="Webhook not found")
-        return webhook
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Webhook not found",
+                business_code=BusinessCode.WEBHOOK_NOT_FOUND
+            )
+        return ServiceResult.success_result(webhook)
 
     def get_logs_by_webhook(self, webhook_id: str, ontology_name: str = None, status: str = None, skip: int = 0, limit: int = 20) -> schemas.PaginatedWebhookDeliveryResponse:
         deliveries, total = self.repo.get_logs_by_webhook(webhook_id, ontology_name, status, skip, limit)
@@ -93,10 +117,14 @@ class WebhookService:
             })
         return results
 
-    async def ping_webhook(self, webhook_id: str) -> dict:
+    async def ping_webhook(self, webhook_id: str) -> ServiceResult[dict]:
         webhook = self.repo.get_webhook(webhook_id)
         if not webhook:
-            raise HTTPException(status_code=404, detail="Webhook not found")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Webhook not found",
+                business_code=BusinessCode.WEBHOOK_NOT_FOUND
+            )
             
         payload = {
             "event": "ping",
@@ -116,13 +144,13 @@ class WebhookService:
                 secret_token=webhook.secret_token,
                 ontology_name="SYSTEM_PING"
             )
-            return {
+            return ServiceResult.success_result({
                 "status": result["status"],
                 "response_status": result["response_status"],
                 "error_message": result["error_message"]
-            }
+            })
         except Exception as e:
-            return {"status": "FAILURE", "error_message": str(e)}
+            return ServiceResult.failure_result(ServiceStatus.FAILURE, str(e))
 
     def broadcast_event(self, event_type: str, payload: dict, ontology_name: str, background_tasks, file_path: str = None):
         """Find matching webhooks and add broadcast task to background_tasks."""
@@ -148,7 +176,11 @@ class WebhookService:
         """手动触发单个订阅的推送"""
         webhook = self.repo.get_webhook(webhook_id)
         if not webhook:
-            raise HTTPException(status_code=404, detail="Webhook not found")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Webhook not found",
+                business_code=BusinessCode.WEBHOOK_NOT_FOUND
+            )
 
         # 构造激活事件 payload
         payload = {
@@ -175,10 +207,10 @@ class WebhookService:
         if sync:
             # 同步执行 (即使在 async def 中也是 await)
             result = await utils.send_webhook_request(**request)
-            return result
+            return ServiceResult.success_result(result)
         else:
             background_tasks.add_task(utils.broadcast_webhook_requests, [request])
-            return {"status": "queued"}
+            return ServiceResult.success_result({"status": "queued"})
 
     def get_ontology_delivery_status(self, package_id: str, ontology_name: str = None) -> List[dict]:
         """准确聚合特定本体版本的推送状态"""

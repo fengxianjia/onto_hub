@@ -32,6 +32,9 @@ class WebhookRepository:
     def get_webhook(self, webhook_id: str) -> Optional[models.Webhook]:
         return self.db.query(models.Webhook).filter(models.Webhook.id == webhook_id).first()
 
+    def get_webhook_by_name(self, name: str) -> Optional[models.Webhook]:
+        return self.db.query(models.Webhook).filter(models.Webhook.name == name).first()
+
     def list_webhooks(self, skip: int = 0, limit: int = 100) -> Tuple[List[models.Webhook], int]:
         query = self.db.query(models.Webhook)
         total = query.count()

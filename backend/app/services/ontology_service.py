@@ -4,15 +4,16 @@ import zipfile
 import logging
 import json
 import aiofiles
-import difflib
 from datetime import datetime
-from fastapi import UploadFile, HTTPException, status
+from fastapi import UploadFile
 from typing import List, Optional
 
 from ..repositories.ontology_repo import OntologyRepository
 from ..repositories.webhook_repo import WebhookRepository
 from ..core.events import dispatcher
 from .. import models, schemas, utils
+from ..core.results import ServiceResult, ServiceStatus
+from ..core.errors import BusinessCode
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,39 @@ class OntologyService:
         self.onto_repo = onto_repo
         self.webhook_repo = webhook_repo
         self.webhook_service = webhook_service
+
+    async def update_ontology_series(self, code: str, series_in: schemas.OntologySeriesUpdate) -> ServiceResult[models.OntologySeries]:
+        series = self.onto_repo.get_series(code)
+        if not series:
+            return ServiceResult.failure_result(ServiceStatus.NOT_FOUND, f"Ontology '{code}' not found")
+        
+        updated = self.onto_repo.update_series(
+            code, 
+            name=series_in.name, 
+            description=series_in.description, 
+            default_template_id=series_in.default_template_id
+        )
+        return ServiceResult.success_result(updated)
+    
+    async def reparse_ontology_package(self, package_id: str, template_id: Optional[str] = None) -> ServiceResult[bool]:
+        package = self.onto_repo.get_package(package_id)
+        if not package:
+            return ServiceResult.failure_result(ServiceStatus.NOT_FOUND, f"Package '{package_id}' not found")
+        
+        # If no template_id provided, use the one already on the package or series default
+        final_template_id = template_id
+        if not final_template_id:
+            final_template_id = package.template_id
+            if not final_template_id:
+                series = self.onto_repo.get_series(package.series_code)
+                final_template_id = series.default_template_id if series else None
+        
+        if not final_template_id:
+            return ServiceResult.failure_result(ServiceStatus.FAILURE, "No parsing template associated with this ontology")
+        
+        # We don't background task here, we just return the template_id to use
+        # The caller (main.py) will add it to background tasks
+        return ServiceResult.success_result(final_template_id)
 
     def _get_storage_path(self, package_id: str) -> str:
         return os.path.join(BASE_STORAGE_DIR, package_id)
@@ -61,8 +95,35 @@ class OntologyService:
             with zip_ref.open(member) as source, open(target_path, "wb") as target:
                 shutil.copyfileobj(source, target)
 
-    async def create_ontology(self, file: UploadFile, code: str, custom_id: str = None, name: str = None, template_id: str = None) -> models.OntologyPackage:
-        # Simplified process based on manager.py
+    async def create_ontology(self, file: UploadFile, code: str, custom_id: str = None, name: str = None, template_id: str = None, is_initial: bool = False) -> ServiceResult[models.OntologyPackage]:
+        # 严格分层：校验逻辑下沉
+        if is_initial:
+            existing_version = self.onto_repo.get_latest_version(code)
+            if existing_version > 0:
+                return ServiceResult.failure_result(
+                    ServiceStatus.ALREADY_EXISTS, 
+                    f"Ontology code '{code}' already exists.",
+                    business_code=BusinessCode.ONTOLOGY_ALREADY_EXISTS
+                )
+            
+            if name:
+                existing_name_series = self.onto_repo.get_series_by_name(name)
+                if existing_name_series:
+                    return ServiceResult.failure_result(
+                        ServiceStatus.DUPLICATE_NAME, 
+                        f"Ontology name '{name}' already exists.",
+                        business_code=BusinessCode.ONTOLOGY_NAME_ALREADY_EXISTS
+                    )
+        else:
+            existing_version = self.onto_repo.get_latest_version(code)
+            if existing_version == 0:
+                return ServiceResult.failure_result(
+                    ServiceStatus.NOT_FOUND, 
+                    f"Ontology code '{code}' not found.",
+                    business_code=BusinessCode.ONTOLOGY_NOT_FOUND
+                )
+
+        # 保存文件并创建记录
         temp_zip = os.path.join(BASE_STORAGE_DIR, f"temp_{datetime.now().timestamp()}.zip")
         async with aiofiles.open(temp_zip, 'wb') as out_file:
             content = await file.read()
@@ -150,15 +211,19 @@ class OntologyService:
             # Auto activate on upload
             self.activate_ontology(db_package.id)
             
-            return db_package
+            return ServiceResult.success_result(db_package)
         finally:
             if os.path.exists(temp_zip):
                 os.remove(temp_zip)
 
-    def activate_ontology(self, package_id: str) -> models.OntologyPackage:
+    def activate_ontology(self, package_id: str) -> ServiceResult[models.OntologyPackage]:
         package = self.onto_repo.get_package(package_id)
         if not package:
-            raise HTTPException(status_code=404, detail="Package not found")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Package not found",
+                business_code=BusinessCode.ONTOLOGY_NOT_FOUND
+            )
         
         # 激活前先确保此本体包的基础信息已同步
         self.onto_repo.set_active_version(package.series_code, package_id)
@@ -171,7 +236,7 @@ class OntologyService:
             "package_id": package.id
         })
         
-        return package
+        return ServiceResult.success_result(package)
 
     def list_ontologies(self, skip: int = 0, limit: int = 100, name: str = None, code: str = None, all_versions: bool = False) -> schemas.PaginatedOntologyResponse:
         # If all_versions is True and code is provided, we list versions of a series.
@@ -272,10 +337,14 @@ class OntologyService:
                 pkg.is_deletable = True
                 pkg.deletable_reason = None
 
-    def get_ontology_detail(self, package_id: str):
+    def get_ontology_detail(self, package_id: str) -> ServiceResult[schemas.OntologyPackageDetailResponse]:
         package = self.onto_repo.get_package(package_id)
         if not package:
-            raise HTTPException(status_code=404, detail="Package not found")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Package not found",
+                business_code=BusinessCode.ONTOLOGY_NOT_FOUND
+            )
         
         # Convert to Pydantic model
         result = schemas.OntologyPackageDetailResponse.model_validate(package)
@@ -303,34 +372,42 @@ class OntologyService:
             result.is_deletable = True
             result.deletable_reason = None
 
-        return result
+        return ServiceResult.success_result(result)
 
-    def get_file_content(self, package_id: str, relative_path: str) -> str:
+    def get_file_content(self, package_id: str, relative_path: str) -> ServiceResult[str]:
         # Check storage
         file_path = os.path.join(self._get_storage_path(package_id), relative_path)
         if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="File not found on disk")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "File not found on disk",
+                business_code=BusinessCode.RESOURCE_NOT_FOUND
+            )
         
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
+                return ServiceResult.success_result(f.read())
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
 
-    def delete_version(self, package_id: str):
+    def delete_version(self, package_id: str) -> ServiceResult[None]:
         """删除指定版本的本体及物理文件"""
         package = self.onto_repo.get_package(package_id)
         if not package:
-            raise HTTPException(status_code=404, detail="Package not found")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Package not found",
+                business_code=BusinessCode.ONTOLOGY_NOT_FOUND
+            )
             
         # 安全校验：Active 的不能删
         if package.is_active:
-            raise HTTPException(status_code=400, detail="正在启用的版本不能删除")
+            return ServiceResult.failure_result(ServiceStatus.VERSION_ACTIVE, "正在启用的版本不能删除")
             
         # 安全校验：订阅者正在使用的不能删
         in_use_ids = self.webhook_service.get_in_use_package_ids(package.series_code)
         if package.id in in_use_ids:
-            raise HTTPException(status_code=400, detail="该版本正在 Webhook 订阅中使用，不能删除")
+            return ServiceResult.failure_result(ServiceStatus.RESOURCE_IN_USE, "该版本正在 Webhook 订阅中使用，不能删除")
 
         self.onto_repo.delete_package(package_id)
         storage_path = self._get_storage_path(package_id)
@@ -341,12 +418,18 @@ class OntologyService:
         zip_path = self.get_source_zip_path(package_id)
         if os.path.exists(zip_path):
             os.remove(zip_path)
+            
+        return ServiceResult.success_result()
 
-    def delete_ontology_series(self, code: str):
+    def delete_ontology_series(self, code: str) -> ServiceResult[None]:
         """删除整个本体系列及其所有物理文件 (高危操作)"""
         series = self.onto_repo.get_series(code)
         if not series:
-            raise HTTPException(status_code=404, detail="Ontology series not found")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Ontology series not found",
+                business_code=BusinessCode.ONTOLOGY_NOT_FOUND
+            )
 
         # 1. 物理清理：删除该系列下所有版本的物理文件
         packages, _ = self.onto_repo.list_packages(series_code=code, limit=1000)
@@ -362,6 +445,7 @@ class OntologyService:
         # 2. 数据库清理：利用 Repository 执行级联删除
         self.onto_repo.delete_series(code)
         logger.info(f"Ontology series '{code}' and its {len(packages)} versions have been deleted.")
+        return ServiceResult.success_result()
 
     def delete_ontology(self, package_id: str):
         # Backward compatibility alias
@@ -376,13 +460,17 @@ class OntologyService:
         items, total = self.onto_repo.get_relations(package_id, skip, limit)
         return {"items": items, "total": total}
 
-    async def compare_packages(self, base_id: str, target_id: str) -> schemas.OntologyComparisonResponse:
+    async def compare_packages(self, base_id: str, target_id: str) -> ServiceResult[schemas.OntologyComparisonResponse]:
         """比较两个本体版本的差异 (Beyond Compare 风格)"""
         base_pkg = self.onto_repo.get_package(base_id)
         target_pkg = self.onto_repo.get_package(target_id)
         
         if not base_pkg or not target_pkg:
-            raise HTTPException(status_code=404, detail="Package not found")
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Package not found",
+                business_code=BusinessCode.ONTOLOGY_NOT_FOUND
+            )
 
         base_files = {f.file_path: f for f in base_pkg.files}
         target_files = {f.file_path: f for f in target_pkg.files}
@@ -444,8 +532,8 @@ class OntologyService:
                 target_content=target_content
             ))
 
-        return schemas.OntologyComparisonResponse(
+        return ServiceResult.success_result(schemas.OntologyComparisonResponse(
             base_version=base_pkg.version,
             target_version=target_pkg.version,
             files=diff_results
-        )
+        ))

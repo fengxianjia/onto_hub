@@ -85,7 +85,7 @@
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          class="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          class="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold"
                           @click="openDeleteOntologyDialog(row)"
                         >
                           删除
@@ -180,7 +180,7 @@
     </Dialog>
 
     <!-- Upload Dialog -->
-    <Dialog v-model="uploadDialogVisible" title="新建本体" width="600px">
+    <Dialog v-model="uploadDialogVisible" title="新建本体" size="md">
       <div class="space-y-6">
         
         <!-- 新建本体表单 -->
@@ -291,7 +291,7 @@ import VersionHistoryDrawer from './components/VersionHistoryDrawer.vue'
 import VersionCompareDialog from './components/VersionCompareDialog.vue'
 import DeliveryStatusDialog from './components/DeliveryStatusDialog.vue'
 import VersionPushStatusDialog from './components/VersionPushStatusDialog.vue'
-import { showMessage } from './utils/message.js'
+import { showMessage, message } from './utils/message.js'
 
 // Tabs
 const tabs = [
@@ -387,6 +387,13 @@ const templateOptions = computed(() => {
 // Methods
 const openUploadDialog = () => {
   fetchTemplates()
+  // Reset form
+  newOntologyForm.value = { 
+    code: '', 
+    name: '', 
+    templateId: '', 
+    autoPush: true 
+  }
   uploadDialogVisible.value = true
 }
 
@@ -445,13 +452,15 @@ const submitNewOntology = async () => {
     const res = await axios.post('/api/ontologies', formData)
     showMessage(`上传成功: ${res.data.code} v${res.data.version}`, 'success')
     
-    // 打开推送状态对话框
-    pushStatusDialog.value = {
-      visible: true,
-      packageId: res.data.id,
-      ontologyCode: res.data.code,
-      ontologyName: res.data.name,
-      version: res.data.version
+    // 打开推送状态对话框 (仅当 auto_push 为 true 且确实有订阅者时)
+    if (newOntologyForm.value.autoPush && res.data.subscriber_count > 0) {
+      pushStatusDialog.value = {
+        visible: true,
+        packageId: res.data.id,
+        ontologyCode: res.data.code,
+        ontologyName: res.data.name,
+        version: res.data.version
+      }
     }
     
     // Reset form
@@ -462,7 +471,7 @@ const submitNewOntology = async () => {
     
     fetchOntologies()
   } catch (e) {
-    showMessage('上传失败', 'error')
+    showMessage(message.getErrorMessage(e, '上传失败'), 'error')
   } finally {
     uploading.value = false
   }
@@ -482,8 +491,8 @@ const fetchOntologies = async () => {
     })
     tableData.value = res.data.items
     pagination.total = res.data.total
-  } catch (error) {
-    showMessage('获取列表失败', 'error')
+  } catch (e) {
+    showMessage(message.getErrorMessage(e, '获取本体列表失败'), 'error')
   } finally {
     loading.value = false
   }
@@ -505,13 +514,15 @@ const handleHistory = (row) => {
 }
 
 const handleVersionUploadSuccess = (data) => {
-  // Show push status dialog
-  pushStatusDialog.value = {
-    visible: true,
-    packageId: data.id,
-    ontologyCode: data.code,
-    ontologyName: data.name,
-    version: data.version
+  // Show push status dialog only if autoPush is true AND there are subscribers
+  if ((data.autoPush || data.autoPush === undefined) && data.subscriber_count > 0) {
+    pushStatusDialog.value = {
+      visible: true,
+      packageId: data.id,
+      ontologyCode: data.code,
+      ontologyName: data.name,
+      version: data.version
+    }
   }
 }
 

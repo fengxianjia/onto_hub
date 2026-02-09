@@ -1,12 +1,12 @@
 <template>
-  <Dialog v-model="visible" title="版本对比" size="90%" :close-on-click-outside="false">
+  <Dialog v-model="visible" title="版本对比" size="xl" :close-on-click-outside="false">
     <!-- Loading State -->
     <div v-if="loadingDiff" class="flex items-center justify-center py-12">
       <Loading />
     </div>
 
     <!-- Main Content: Left-Right Layout -->
-    <div v-else class="flex h-[70vh] gap-4">
+    <div v-else class="flex h-[82vh] gap-4">
       <!-- Left Sidebar: File List -->
       <div class="w-80 flex-shrink-0 border-r border-border pr-4 flex flex-col">
         <!-- Statistics -->

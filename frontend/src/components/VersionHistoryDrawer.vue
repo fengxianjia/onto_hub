@@ -239,9 +239,8 @@ const handleFileUpload = async (e) => {
     
     // Auto-activate or show delivery status? 
     // The previous logic showed push status dialog. 
-    // Let's emit an event to parent to show it, or handle it here?
-    // Parent handles `pushStatusDialog`. Let's emit 'upload-success' with data.
-    emit('upload-success', res.data)
+    // Parent handles `pushStatusDialog`. Let's emit 'upload-success' with data and autoPush status.
+    emit('upload-success', { ...res.data, autoPush: autoPush.value })
   } catch (error) {
     message.error(error.response?.data?.detail || '上传失败')
   } finally {
@@ -397,6 +396,14 @@ const handleViewDetail = (version) => {
 const handleCompare = (newVersion, oldVersion) => {
   emit('compare', { newVersion, oldVersion })
 }
+
+watch(() => props.visible, (newVal) => {
+  if (newVal) {
+    fetchVersions()
+    // 每次打开侧边栏，重置推送开关为默认开启
+    autoPush.value = true
+  }
+})
 
 watch(() => props.modelValue, (newVal) => {
   if (newVal && props.ontologyName) {

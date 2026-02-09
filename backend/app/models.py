@@ -69,6 +69,10 @@ class OntologyPackage(Base):
     # 关联文件
     files = relationship("OntologyFile", back_populates="package", cascade="all, delete-orphan")
 
+    # 关联实体和关系
+    entities = relationship("OntologyEntity", back_populates="package", cascade="all, delete-orphan")
+    relations = relationship("OntologyRelation", back_populates="package", cascade="all, delete-orphan")
+
     # 关联模板 (Snapshot, used for this specific version)
     template_id = Column(String, ForeignKey("parsing_templates.id"), nullable=True, comment="使用的解析模板ID")
     template = relationship("ParsingTemplate", back_populates="packages")
@@ -159,7 +163,9 @@ class OntologyEntity(Base):
     file_path = Column(String, nullable=True, comment="来源文件路径")
     
     # 关联
-    package = relationship("OntologyPackage", backref="entities")
+    package = relationship("OntologyPackage", back_populates="entities")
+    out_relations = relationship("OntologyRelation", foreign_keys="[OntologyRelation.source_id]", back_populates="source", cascade="all, delete-orphan")
+    in_relations = relationship("OntologyRelation", foreign_keys="[OntologyRelation.target_id]", back_populates="target")
 
 class OntologyRelation(Base):
     """
@@ -174,7 +180,7 @@ class OntologyRelation(Base):
     relation_type = Column(String, index=True, nullable=False, comment="关系类型 (e.g. depends_on)")
     
     # 关联
-    package = relationship("OntologyPackage", backref="relations")
-    source = relationship("OntologyEntity", foreign_keys=[source_id], backref="out_relations")
-    target = relationship("OntologyEntity", foreign_keys=[target_id], backref="in_relations")
+    package = relationship("OntologyPackage", back_populates="relations")
+    source = relationship("OntologyEntity", foreign_keys=[source_id], back_populates="out_relations")
+    target = relationship("OntologyEntity", foreign_keys=[target_id], back_populates="in_relations")
 

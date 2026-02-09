@@ -117,7 +117,7 @@
                 <td class="px-6 py-4">
                   <div class="flex gap-2">
                     <Button variant="ghost" size="xs" @click="openDialog(t)">编辑</Button>
-                    <Button variant="ghost" size="xs" class="text-danger hover:text-danger hover:bg-danger/10" @click="handleDelete(t)">删除</Button>
+                    <Button variant="ghost" size="xs" class="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold" @click="handleDelete(t)">删除</Button>
                   </div>
                 </td>
               </tr>
@@ -127,7 +127,7 @@
     </Card>
 
     <!-- Edit Dialog -->
-    <Dialog v-model="dialogVisible" :title="editingId ? '编辑模板' : '新建模板'" width="800px" :closeOnClickModal="false">
+    <Dialog v-model="dialogVisible" :title="editingId ? '编辑模板' : '新建模板'" size="lg" :closeOnClickModal="false">
       <div class="space-y-6">
         <div class="grid grid-cols-2 gap-4">
           <Input v-model="form.name" label="模板名称" placeholder="e.g. Standard Wiki" required />
@@ -325,7 +325,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import axios from 'axios'
 import { Button, Card, Empty, Loading, Badge, Dialog, Input, Select } from './index.js'
-import { showMessage } from '../utils/message.js'
+import { showMessage, message, showConfirm } from '../utils/message.js'
 
 const templates = ref([])
 const loading = ref(false)
@@ -486,8 +486,8 @@ const fetchTemplates = async () => {
   try {
     const res = await axios.get('/api/templates/')
     templates.value = res.data
-  } catch (e) {
-    showMessage('获取模板列表失败', 'error')
+  } catch (error) {
+    showMessage(message.getErrorMessage(error, '获取模板列表失败'), 'error')
   } finally {
     loading.value = false
   }
@@ -549,22 +549,23 @@ const submitForm = async () => {
     }
     dialogVisible.value = false
     fetchTemplates()
-  } catch (e) {
-    showMessage('保存失败', 'error')
+  } catch (error) {
+    showMessage(message.getErrorMessage(error, '保存失败'), 'error')
   } finally {
     saving.value = false
   }
 }
 
 const handleDelete = async (template) => {
-  if (!confirm(`确定要删除模板 "${template.name}" 吗？`)) return
-  
   try {
+    await showConfirm(`确定要删除模板 "${template.name}" 吗？`, '删除请求')
     await axios.delete(`/api/templates/${template.id}`)
     showMessage('删除成功', 'success')
     fetchTemplates()
-  } catch (e) {
-    showMessage('删除失败', 'error')
+  } catch (error) {
+    if (error !== 'cancel') {
+      showMessage(message.getErrorMessage(error, '删除失败'), 'error')
+    }
   }
 }
 

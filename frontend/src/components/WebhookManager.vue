@@ -10,7 +10,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </Button>
-          <Button variant="primary" size="sm" @click="handleAdd">新增订阅</Button>
+          <Button variant="primary" size="sm" @click="handleAdd">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            新增订阅
+          </Button>
         </div>
       </div>
     </Card>
@@ -81,7 +86,7 @@
                   <button title="编辑" @click="handleEdit(row)" class="p-1.5 rounded-lg text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                   </button>
-                  <button title="删除" @click="handleDelete(row)" class="p-1.5 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors">
+                  <button title="删除" @click="handleDelete(row)" class="p-1.5 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors font-bold">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                   </button>
                 </div>
@@ -105,7 +110,7 @@
     </Card>
 
     <!-- Create/Edit Dialog -->
-    <Dialog v-model="dialogVisible" :title="isEdit ? '编辑订阅' : '新增订阅'" width="600px">
+    <Dialog v-model="dialogVisible" :title="isEdit ? '编辑订阅' : '新增订阅'" size="md">
       <div class="space-y-6">
         <Input
           v-model="form.name"
@@ -204,7 +209,7 @@ import { ref, onMounted, reactive, computed } from 'vue'
 import axios from 'axios'
 import { Card, Button, Badge, Dialog, Input, Select, Loading, Empty, Pagination } from './index.js'
 import WebhookLogDrawer from './WebhookLogDrawer.vue'
-import { showMessage, showConfirm } from '../utils/message.js'
+import { message, showMessage, showConfirm } from '../utils/message.js'
 
 const emit = defineEmits(['change'])
 
@@ -298,8 +303,9 @@ const fetchWebhooks = async () => {
     tableData.value = res.data.items
     pagination.total = res.data.total
     emit('change')
+    emit('change')
   } catch (error) {
-    showMessage('获取订阅列表失败', 'error')
+    showMessage(message.getErrorMessage(error, '获取订阅列表失败'), 'error')
   } finally {
     loading.value = false
   }
@@ -347,7 +353,7 @@ const handleDelete = async (row) => {
     fetchWebhooks()
   } catch (error) {
     if (error !== 'cancel') {
-      showMessage('删除失败', 'error')
+      showMessage(message.getErrorMessage(error, '删除失败'), 'error')
     }
   }
 }
@@ -385,7 +391,7 @@ const fetchLogs = async (filters = {}) => {
     logsData.value = res.data.items
     logsPagination.total = res.data.total
   } catch (e) {
-    showMessage('获取日志失败', 'error')
+    showMessage(message.getErrorMessage(e, '获取日志失败'), 'error')
   } finally {
     logsLoading.value = false
   }
@@ -441,7 +447,7 @@ const handleSubmit = async () => {
     dialogVisible.value = false
     fetchWebhooks()
   } catch (error) {
-    showMessage(isEdit.value ? '更新失败' : '创建失败', 'error')
+    showMessage(message.getErrorMessage(error, '保存失败'), 'error')
   } finally {
     submitting.value = false
   }

@@ -39,9 +39,18 @@ class OntologyPackageResponse(OntologyPackageBase):
 
     template_id: Optional[str] = None
     template_name: Optional[str] = None
+    subscriber_count: Optional[int] = 0
     
     class Config:
         from_attributes = True
+
+class OntologySeriesUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    default_template_id: Optional[str] = None
+
+class OntologyReparseRequest(BaseModel):
+    template_id: Optional[str] = None
 
 class OntologyPackageDetailResponse(OntologyPackageResponse):
     files: List[OntologyFileResponse] = []

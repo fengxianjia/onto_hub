@@ -10,8 +10,11 @@ from datetime import datetime
 from .config import settings
 from .core.logging import setup_logging
 
-# 立即初始化统一日志，必须在导入其他业务模块之前，确保所有 module-level logger 正确继承配置
+# 立即初始化统一日志
 setup_logging()
+
+from .core.errors import BusinessException, BusinessCode, handle_result
+from fastapi.responses import JSONResponse
 
 from . import models, schemas, database, utils
 
@@ -50,6 +53,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(BusinessException)
+async def business_exception_handler(request: Request, exc: BusinessException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": exc.business_code,
+            "detail": exc.detail or "Business error occurred"
+        }
+    )
+
 def get_db():
     db = database.SessionLocal()
     try:
@@ -81,23 +94,27 @@ async def create_ontology_series(
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
 ):
-    # Check if series exists
-    existing_version = service.onto_repo.get_latest_version(code)
-    if existing_version > 0:
-         raise HTTPException(status_code=400, detail=f"Ontology code '{code}' already exists. Use POST /api/ontologies/{code}/versions to add a new version.")
-
-    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=name, template_id=template_id)
+    result = await service.create_ontology(file, code=code, custom_id=custom_id, name=name, template_id=template_id, is_initial=True)
+    package = handle_result(result)
     
+    # Check for subscribers
+    matching_webhooks = webhook_service.repo.get_webhooks_by_event("ontology.activated", ontology_name=code)
+    subscriber_count = len(matching_webhooks)
+
     # Broadcast Webhook only if auto_push is True
     if auto_push:
         _broadcast_activation(package, service, webhook_service, background_tasks)
     
+    # Set subscriber count for response
+    package_resp = schemas.OntologyPackageResponse.from_orm(package)
+    package_resp.subscriber_count = subscriber_count
+
     # Trigger Parsing Logic
     final_template_id = template_id or package.template_id
     if final_template_id:
         background_tasks.add_task(parse_ontology_task, package.id, final_template_id)
         
-    return package
+    return package_resp
 
 @app.post("/api/ontologies/{code}/versions", response_model=schemas.OntologyPackageResponse, status_code=201)
 async def add_ontology_version(
@@ -110,23 +127,65 @@ async def add_ontology_version(
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
 ):
-    # Check if series exists
-    existing_version = service.onto_repo.get_latest_version(code)
-    if existing_version == 0:
-         raise HTTPException(status_code=404, detail=f"Ontology code '{code}' not found. Use POST /api/ontologies to create it first.")
+    result = await service.create_ontology(file, code=code, custom_id=custom_id, name=None, template_id=template_id, is_initial=False)
+    package = handle_result(result)
     
-    package = await service.create_ontology(file, code=code, custom_id=custom_id, name=None, template_id=template_id)
-    
+    # Check for subscribers
+    matching_webhooks = webhook_service.repo.get_webhooks_by_event("ontology.activated", ontology_name=code)
+    subscriber_count = len(matching_webhooks)
+
     # Broadcast Webhook only if auto_push is True
     if auto_push:
         _broadcast_activation(package, service, webhook_service, background_tasks)
     
+    # Set subscriber count for response
+    package_resp = schemas.OntologyPackageResponse.from_orm(package)
+    package_resp.subscriber_count = subscriber_count
+
     # Trigger Parsing Logic
     final_template_id = template_id or package.template_id
     if final_template_id:
         background_tasks.add_task(parse_ontology_task, package.id, final_template_id)
         
+    return package_resp
+
+@app.patch("/api/ontologies/{code}", response_model=schemas.OntologyPackageResponse)
+async def update_ontology_metadata(
+    code: str,
+    series_in: schemas.OntologySeriesUpdate,
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """更新本体元数据 (名称、描述、默认模板)"""
+    result = await service.update_ontology_series(code, series_in)
+    series = handle_result(result)
+    
+    # Return latest version info as a convenience
+    latest_version = service.onto_repo.get_latest_version(code)
+    package = service.onto_repo.get_active_package_by_code(code)
+    if not package:
+        # Get latest
+        pkg_list, _ = service.onto_repo.list_packages(latest_version, limit=1)
+        package = pkg_list[0] if pkg_list else None
+    
+    if not package:
+         raise HTTPException(status_code=404, detail="No versions found for this ontology")
+         
     return package
+
+@app.post("/api/ontologies/packages/{package_id}/reparse")
+async def reparse_ontology(
+    package_id: str,
+    background_tasks: BackgroundTasks,
+    req: schemas.OntologyReparseRequest = None,
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """重新触发本体解析"""
+    template_id = req.template_id if req else None
+    result = await service.reparse_ontology_package(package_id, template_id)
+    final_template_id = handle_result(result)
+    
+    background_tasks.add_task(parse_ontology_task, package_id, final_template_id)
+    return {"message": "Parsing task triggered", "template_id": final_template_id}
 
 def _broadcast_activation(package, service, webhook_service, background_tasks):
     payload = {
@@ -153,7 +212,8 @@ def create_webhook(
     webhook: schemas.WebhookCreate,
     service: WebhookService = Depends(get_webhook_service)
 ):
-    return service.create_webhook(webhook)
+    result = service.create_webhook(webhook)
+    return handle_result(result)
 
 @app.get("/api/webhooks", response_model=schemas.PaginatedWebhookResponse)
 def list_webhooks(
@@ -181,7 +241,8 @@ def update_webhook(
     webhook: schemas.WebhookCreate,
     service: WebhookService = Depends(get_webhook_service)
 ):
-    return service.update_webhook(id, webhook)
+    result = service.update_webhook(id, webhook)
+    return handle_result(result)
 
 @app.get("/api/webhooks/{id}/logs", response_model=schemas.PaginatedWebhookDeliveryResponse)
 def get_webhook_logs(
@@ -199,7 +260,8 @@ async def ping_webhook(
     id: str,
     service: WebhookService = Depends(get_webhook_service)
 ):
-    return await service.ping_webhook(id)
+    result = await service.ping_webhook(id)
+    return handle_result(result)
 
 @app.get("/api/ontologies", response_model=schemas.PaginatedOntologyResponse)
 def get_ontologies(
@@ -229,7 +291,8 @@ def activate_ontology(
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
 ):
-    package = service.activate_ontology(id)
+    result = service.activate_ontology(id)
+    package = handle_result(result)
     
     payload = {
         "event": "ontology.activated",
@@ -263,23 +326,26 @@ async def push_ontology_to_webhook(
     将指定版本的本体推送到指定的 Webhook，不改变本体的激活状态。
     同步等待推送结果，以便前端展示。
     """
-    # 1. 获取本体包信息
+    # 1. 获取本体详情 (包含了 path 获取逻辑，虽然 trigger_subscription 本身需要 package 对象，我们先获取结果)
+    pkg_result = service.get_ontology_detail(id)
+    package_detail = handle_result(pkg_result)
+    
+    # 获取 DB 对象用于推送
     package = service.onto_repo.get_package(id)
-    if not package:
-        raise HTTPException(status_code=404, detail="Ontology package not found")
-        
+    
     # 2. 获取源文件路径
     zip_path = service.get_source_zip_path(package.id)
     
     # 3. 触发单点推送 (同步)
-    result = await webhook_service.trigger_subscription(package, webhook_id, background_tasks, zip_path, sync=True)
+    push_result = await webhook_service.trigger_subscription(package, webhook_id, background_tasks, zip_path, sync=True)
+    result_data = handle_result(push_result)
     
     return {
         "status": "pushed", 
         "package": package.code, 
         "version": package.version, 
         "target": webhook_id,
-        "delivery_result": result
+        "delivery_result": result_data
     }
 
 @app.delete("/api/ontologies/{id}", status_code=204)
@@ -290,9 +356,9 @@ def delete_ontology_version(
     """
     **删除指定版本的本体**
     - 不能删除当前激活的版本
-    - 不能删除被 Webhook 订阅引用的版本
     """
-    service.delete_version(id)
+    result = service.delete_version(id)
+    handle_result(result)
     return None
 
 @app.delete("/api/ontologies/by-code/{code}", status_code=204)
@@ -302,9 +368,9 @@ def delete_ontology_series(
 ):
     """
     **删除整个本体系列 (高危)**
-    - 删除所有版本记录、文件及物理存储
     """
-    service.delete_ontology_series(code)
+    result = service.delete_ontology_series(code)
+    handle_result(result)
     return None
 
 @app.get("/api/ontologies/compare", response_model=schemas.OntologyComparisonResponse)
@@ -314,7 +380,8 @@ async def compare_ontologies(
     service: OntologyService = Depends(get_ontology_service)
 ):
     """比较两个本体版本之间的差异"""
-    return await service.compare_packages(base_id, target_id)
+    result = await service.compare_packages(base_id, target_id)
+    return handle_result(result)
 
 @app.get("/api/ontologies/by-code/{code}/subscriptions")
 def get_ontology_subscriptions(
@@ -322,8 +389,6 @@ def get_ontology_subscriptions(
     service: WebhookService = Depends(get_webhook_service)
 ):
     """获取订阅了指定本体的所有 Webhook 及其使用的版本"""
-    # 直接使用 code 查询订阅,不需要先查询本体是否存在
-    # 因为即使本体不存在,也可能有 webhook 订阅了它(提前注册)
     return service.get_subscription_status(name=None, code=code)
 
 @app.get("/api/ontologies/{id}", response_model=schemas.OntologyPackageDetailResponse)
@@ -331,7 +396,8 @@ def get_ontology_detail(
     id: str,
     service: OntologyService = Depends(get_ontology_service)
 ):
-    return service.get_ontology_detail(id)
+    result = service.get_ontology_detail(id)
+    return handle_result(result)
 
 @app.get("/api/ontologies/{id}/deliveries")
 def get_ontology_deliveries(
@@ -342,9 +408,9 @@ def get_ontology_deliveries(
     """
     **获取本体包的 Webhook 推送状态**
     """
-    # 必须先获取本体Code以过滤 Webhook
-    package = onto_service.get_ontology_detail(id)
-    return webhook_service.get_ontology_delivery_status(id, package.code) # Use Code
+    pkg_result = onto_service.get_ontology_detail(id)
+    package = handle_result(pkg_result)
+    return webhook_service.get_ontology_delivery_status(id, package.code)
 
 @app.get("/api/ontologies/{id}/files")
 def read_ontology_file(
@@ -352,8 +418,8 @@ def read_ontology_file(
     path: str = Query(..., description="文件相对路径"),
     service: OntologyService = Depends(get_ontology_service)
 ):
-    content = service.get_file_content(id, path)
-    return {"content": content}
+    result = service.get_file_content(id, path)
+    return {"content": handle_result(result)}
 
 @app.get("/api/ontologies/{id}/graph", response_model=schemas.OntologyGraphResponse)
 def get_ontology_graph(

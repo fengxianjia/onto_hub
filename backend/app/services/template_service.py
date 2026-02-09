@@ -1,7 +1,8 @@
 from typing import List, Optional
-from fastapi import HTTPException
 from ..repositories.template_repo import TemplateRepository
 from .. import schemas
+from ..core.results import ServiceResult, ServiceStatus
+from ..core.errors import BusinessCode
 
 class TemplateService:
     def __init__(self, template_repo: TemplateRepository):
@@ -11,32 +12,53 @@ class TemplateService:
         templates = self.template_repo.list_templates(skip, limit)
         return [schemas.ParsingTemplateResponse.model_validate(t) for t in templates]
 
-    def get_template(self, template_id: str) -> schemas.ParsingTemplateResponse:
+    def get_template(self, template_id: str) -> ServiceResult[schemas.ParsingTemplateResponse]:
         template = self.template_repo.get_template(template_id)
         if not template:
-            raise HTTPException(status_code=404, detail="Template not found")
-        return schemas.ParsingTemplateResponse.model_validate(template)
+             return ServiceResult.failure_result(
+                 ServiceStatus.NOT_FOUND, 
+                 "Template not found",
+                 business_code=BusinessCode.TEMPLATE_NOT_FOUND
+             )
+        return ServiceResult.success_result(schemas.ParsingTemplateResponse.model_validate(template))
 
-    def create_template(self, template: schemas.ParsingTemplateCreate) -> schemas.ParsingTemplateResponse:
+    def create_template(self, template: schemas.ParsingTemplateCreate) -> ServiceResult[schemas.ParsingTemplateResponse]:
+        # Validation is now preferred in service for strict layering logic
         if self.template_repo.get_template_by_name(template.name):
-            raise HTTPException(status_code=400, detail="Template with this name already exists")
-        
-        # Validate JSON rules logic here if needed
-        # import json
-        # try:
-        #    json.loads(template.rules)
-        # except:
-        #    raise HTTPException(status_code=400, detail="Invalid JSON format for rules")
-
+            return ServiceResult.failure_result(
+                ServiceStatus.DUPLICATE_NAME, 
+                f"Template name '{template.name}' already exists.",
+                business_code=BusinessCode.TEMPLATE_NAME_DUPLICATE
+            )
+            
         new_template = self.template_repo.create_template(template)
-        return schemas.ParsingTemplateResponse.model_validate(new_template)
+        return ServiceResult.success_result(schemas.ParsingTemplateResponse.model_validate(new_template))
     
-    def delete_template(self, template_id: str):
-        if not self.template_repo.delete_template(template_id):
-             raise HTTPException(status_code=400, detail="Cannot delete template: it is in use or does not exist")
+    def delete_template(self, template_id: str) -> ServiceResult[None]:
+        db_template = self.template_repo.get_template(template_id)
+        if not db_template:
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Template not found",
+                business_code=BusinessCode.TEMPLATE_NOT_FOUND
+            )
+            
+        if db_template.packages:
+            return ServiceResult.failure_result(
+                ServiceStatus.RESOURCE_IN_USE, 
+                "Template is in use and cannot be deleted",
+                business_code=BusinessCode.RESOURCE_IN_USE
+            )
+            
+        self.template_repo.delete_template(template_id)
+        return ServiceResult.success_result()
     
-    def update_template(self, template_id: str, template: schemas.ParsingTemplateCreate) -> schemas.ParsingTemplateResponse:
+    def update_template(self, template_id: str, template: schemas.ParsingTemplateCreate) -> ServiceResult[schemas.ParsingTemplateResponse]:
         updated = self.template_repo.update_template(template_id, template)
         if not updated:
-            raise HTTPException(status_code=404, detail="Template not found")
-        return schemas.ParsingTemplateResponse.model_validate(updated)
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND, 
+                "Template not found",
+                business_code=BusinessCode.TEMPLATE_NOT_FOUND
+            )
+        return ServiceResult.success_result(schemas.ParsingTemplateResponse.model_validate(updated))

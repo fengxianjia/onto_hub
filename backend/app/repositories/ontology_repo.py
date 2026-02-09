@@ -10,6 +10,9 @@ class OntologyRepository:
     def get_series(self, code: str) -> Optional[models.OntologySeries]:
         return self.db.query(models.OntologySeries).filter(models.OntologySeries.code == code).first()
 
+    def get_series_by_name(self, name: str) -> Optional[models.OntologySeries]:
+        return self.db.query(models.OntologySeries).filter(models.OntologySeries.name == name).first()
+
     def get_series_list(self, skip: int = 0, limit: int = 100, name: str = None) -> Tuple[List[models.OntologySeries], int]:
         query = self.db.query(models.OntologySeries)
         if name:
