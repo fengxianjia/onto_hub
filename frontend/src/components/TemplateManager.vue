@@ -73,8 +73,8 @@
               <li><code class="bg-muted px-1 rounded text-foreground">strategies</code>: 高级提取策略列表
                 <ul class="pl-5 mt-1 list-none text-xs space-y-1">
                   <li>• <code>type="table_row"</code>: 提取表格行作为对象列表</li>
-                  <li>• <code>target_key</code>: 结果存储字段 (e.g. "properties")</li>
-                  <li>• <code>header_mapping</code>: 表头到属性名的映射 (e.g. "显示名称": "name")</li>
+                  <li>• <code>target_key</code>: 结果存储字段</li>
+                  <li>• <code>header_mapping</code>: 解析后的属性映射</li>
                 </ul>
               </li>
             </ul>
@@ -260,15 +260,24 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                   </Button>
 
-                  <div class="grid grid-cols-2 gap-6 pr-10">
-                    <Input v-model="strat.target_key" label="目标存储字段 (JSON Key)" placeholder="e.g. node_properties" size="sm" />
-                    <div class="flex items-end pb-1.5">
-                      <div class="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
-                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                         解析模式: Table Rows
-                      </div>
+                    <div class="flex-1">
+                      <Select 
+                        v-model="strat.type" 
+                        label="策略类型" 
+                        size="sm"
+                        :options="[
+                          { label: '表格行转列表 (table_row)', value: 'table_row' }
+                        ]"
+                      />
                     </div>
-                  </div>
+                    <div class="flex-1">
+                      <Input 
+                        v-model="strat.target_key" 
+                        label="目标存储字段 (JSON Key)" 
+                        placeholder="e.g. properties" 
+                        size="sm" 
+                      />
+                    </div>
 
                   <div class="space-y-3 p-4 bg-muted/20 rounded-lg border border-dashed border-border/60">
                     <div class="text-xs font-bold text-foreground flex justify-between items-center">
@@ -419,14 +428,15 @@ const syncVisualToJson = () => {
     attribute: {
       regex_patterns: visualRules.attribute.regex_patterns.filter(p => p.key && p.pattern),
       strategies: visualRules.attribute.strategies.map(s => {
-        const header_mapping = {}
+        const mapping = {}
         s.header_maps.forEach(m => {
-          if (m.from) header_mapping[m.from] = m.to
+          if (m.from) mapping[m.from] = m.to
         })
+        
         return {
           type: s.type,
           target_key: s.target_key,
-          header_mapping
+          header_mapping: mapping
         }
       })
     }
@@ -451,8 +461,10 @@ const syncJsonToVisual = () => {
     // Table Strategies
     visualRules.attribute.strategies = (rules.attribute?.strategies || []).map(s => {
       const header_maps = []
-      if (s.header_mapping) {
-        Object.entries(s.header_mapping).forEach(([from, to]) => {
+      const mappingSource = s.header_mapping
+      
+      if (mappingSource) {
+        Object.entries(mappingSource).forEach(([from, to]) => {
           header_maps.push({ from, to })
         })
       }

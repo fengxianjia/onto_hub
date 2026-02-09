@@ -11,6 +11,7 @@ docker-compose build backend
 
 # Step 2: Build & Tag Frontend
 echo "Building Frontend image..."
+export VERSION=$VERSION
 docker-compose build frontend
 
 echo "--- Build Complete ---"

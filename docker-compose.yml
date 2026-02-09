@@ -22,6 +22,7 @@ services:
       - ontohub-network
 
   frontend:
+    image: ontohub-frontend:${VERSION:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile

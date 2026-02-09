@@ -30,13 +30,29 @@ class OntologyService:
     def _get_storage_path(self, package_id: str) -> str:
         return os.path.join(BASE_STORAGE_DIR, package_id)
 
+    def _decode_zip_path(self, raw_path: str) -> str:
+        """
+        解决 Linux 环境下 ZIP 压缩包内中文文件名乱码问题。
+        zipfile 模块默认对于非 UTF-8 标记的文件名使用 cp437 编码，
+        而 Windows 下创建的压缩包通常使用 GBK。
+        """
+        try:
+            # 尝试先转换回字节流，再用 GBK 解码
+            return raw_path.encode('cp437').decode('gbk')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            # 如果转换失败（说明本身就是 UTF-8 或者其他情况），则返回原值
+            return raw_path
+
     def _safe_extract(self, zip_ref: zipfile.ZipFile, extract_path: str):
         for member in zip_ref.namelist():
-            filename = os.path.basename(member)
+            # 修正路径编码
+            decoded_member = self._decode_zip_path(member)
+            filename = os.path.basename(decoded_member)
             if not filename:
                 continue
             
-            target_path = os.path.normpath(os.path.join(extract_path, member))
+            # 使用修正后的路径
+            target_path = os.path.normpath(os.path.join(extract_path, decoded_member))
             if not target_path.startswith(os.path.normpath(extract_path)):
                 logger.warning(f"Zip Slip attempt blocked: {member}")
                 continue

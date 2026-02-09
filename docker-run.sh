@@ -11,6 +11,7 @@ docker-compose down
 
 # Start services in detached mode
 echo "Starting services in background..."
+export VERSION=$VERSION
 docker-compose up -d
 
 # Try to get the IP address (Linux/macOS)

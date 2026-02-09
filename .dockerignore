@@ -2,6 +2,12 @@
 .git
 .gitignore
 
+# Local storage and logs
+data/
+logs/
+*.db
+*.db-journal
+
 # Python
 __pycache__/
 *.py[cod]

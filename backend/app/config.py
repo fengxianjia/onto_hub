@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     BASE_DIR: str = os.path.dirname(os.path.dirname(_current_file))
     
     # Database
-    # Use absolute path for SQLite to prevent it from moving with CWD
-    DATABASE_URL: str = f"sqlite:///{os.path.join(BASE_DIR, 'ontohub.db')}"
+    # Standardize to data/ directory for volume persistence
+    DATABASE_URL: str = f"sqlite:///{os.path.join(BASE_DIR, 'data', 'ontohub.db')}"
     
     # Storage
     # Default to 'backend/data/ontohub_storage' inside BASE_DIR

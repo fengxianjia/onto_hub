@@ -1,16 +1,18 @@
 # Step 1: Build Stage
-FROM node:18-alpine as build-stage
+FROM node:20-alpine as build-stage
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if exists)
-COPY package*.json ./
+# Copy all files first
+COPY . .
 
-# Install dependencies
+# Defensive cleanup: remove any host-side node_modules and dist before installing dependencies in container
+RUN rm -rf node_modules dist
+
+# Install dependencies (on top of fresh container state)
 RUN npm install
 
-# Copy frontend code and build
-COPY . .
+# Build the application
 RUN npm run build
 
 # Step 2: Production Stage
