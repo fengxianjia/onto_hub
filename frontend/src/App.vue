@@ -82,6 +82,14 @@
                         <Button variant="ghost" size="sm" @click="handleView(row)">详情</Button>
                         <Button variant="ghost" size="sm" @click="handleHistory(row)">版本</Button>
                         <Button variant="ghost" size="sm" @click="handleSubscriptionStatus(row)">订阅状态</Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          class="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          @click="openDeleteOntologyDialog(row)"
+                        >
+                          删除
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -201,6 +209,18 @@
             required
             @change="handleNewFileChange"
           />
+          <div class="flex items-center gap-2 py-2">
+            <input 
+              type="checkbox" 
+              id="auto-push-checkbox" 
+              v-model="newOntologyForm.autoPush"
+              class="w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent"
+            >
+            <label for="auto-push-checkbox" class="text-sm font-medium text-foreground cursor-pointer">
+              创建后立即推送给订阅者
+            </label>
+            <span class="text-xs text-muted-foreground ml-1">(默认推荐)</span>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -213,6 +233,44 @@
             @click="submitNewOntology"
           >
             创建并上传
+          </Button>
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- High-Risk Delete Ontology Dialog -->
+    <Dialog v-model="deleteOntologyDialog.visible" title="高危操作：删除本体" width="500px">
+      <div class="space-y-4">
+        <div class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <p class="font-bold mb-1">警告：此操作不可逆！</p>
+          <p>您正在尝试删除本体 <strong>{{ deleteOntologyDialog.name }} ({{ deleteOntologyDialog.code }})</strong>。</p>
+          <ul class="list-disc list-inside mt-2 space-y-1">
+            <li>该本体下的所有<strong>历史版本</strong>将被物理删除。</li>
+            <li>所有关联的<strong>文件、实体、关系数据</strong>将全部丢失。</li>
+            <li>相关的 Webhook 订阅可能会受到影响。</li>
+          </ul>
+        </div>
+        
+        <div class="space-y-2">
+          <p class="text-sm font-medium text-foreground">请输入本体编码 <span class="select-all font-mono bg-muted px-1 rounded">{{ deleteOntologyDialog.code }}</span> 以确认删除：</p>
+          <Input 
+            v-model="deleteOntologyDialog.confirmCode" 
+            placeholder="在此输入编码"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <Button variant="secondary" @click="deleteOntologyDialog.visible = false">取消</Button>
+          <Button 
+            variant="primary" 
+            class="bg-red-600 hover:bg-red-700 border-red-600"
+            :disabled="deleteOntologyDialog.confirmCode !== deleteOntologyDialog.code"
+            :loading="deleteOntologyDialog.loading"
+            @click="confirmDeleteOntology"
+          >
+            确认彻底删除
           </Button>
         </div>
       </template>
@@ -252,7 +310,8 @@ const newFileSelected = ref(false)
 const newOntologyForm = ref({
   code: '',
   name: '',
-  templateId: ''
+  templateId: '',
+  autoPush: true
 })
 
 // Refs
@@ -294,6 +353,15 @@ const selectedOntologyName = ref('')
 const selectedOntologyCode = ref('')
 const selectedPackageId = ref(null)
 const compareVersions = reactive({ new: null, old: null })
+
+// Delete Ontology Dialog State
+const deleteOntologyDialog = ref({
+  visible: false,
+  loading: false,
+  code: '',
+  name: '',
+  confirmCode: ''
+})
 
 // Computed
 const ontologyOptions = computed(() => {
@@ -371,6 +439,7 @@ const submitNewOntology = async () => {
   if (newOntologyForm.value.templateId) {
     formData.append('template_id', newOntologyForm.value.templateId)
   }
+  formData.append('auto_push', newOntologyForm.value.autoPush ? 'true' : 'false')
   
   try {
     const res = await axios.post('/api/ontologies', formData)
@@ -472,6 +541,33 @@ const handleSubscriptionStatus = (row) => {
   selectedOntologyCode.value = row.code
   selectedOntologyName.value = row.name
   subscriptionDialogVisible.value = true
+}
+
+// Delete Ontology Logic
+const openDeleteOntologyDialog = (row) => {
+  deleteOntologyDialog.value = {
+    visible: true,
+    loading: false,
+    code: row.code,
+    name: row.name,
+    confirmCode: ''
+  }
+}
+
+const confirmDeleteOntology = async () => {
+  if (deleteOntologyDialog.value.confirmCode !== deleteOntologyDialog.value.code) return
+  
+  deleteOntologyDialog.value.loading = true
+  try {
+    await axios.delete(`/api/ontologies/by-code/${deleteOntologyDialog.value.code}`)
+    showMessage(`本体 ${deleteOntologyDialog.value.code} 已彻底删除`, 'success')
+    deleteOntologyDialog.value.visible = false
+    fetchOntologies()
+  } catch (error) {
+    showMessage(error.response?.data?.detail || '删除失败', 'error')
+  } finally {
+    deleteOntologyDialog.value.loading = false
+  }
 }
 
 // Lifecycle

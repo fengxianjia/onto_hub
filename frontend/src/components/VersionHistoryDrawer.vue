@@ -5,20 +5,33 @@
         <div class="text-sm text-muted-foreground">
           共 {{ versions.length }} 个版本
         </div>
-        <div class="flex gap-2">
-            <input
-              type="file"
-              ref="fileInputRef"
-              accept=".zip"
-              class="hidden"
-              @change="handleFileUpload"
-            />
-            <Button size="sm" variant="outline" @click="triggerUpload" :loading="uploading">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              上传新版本
-            </Button>
+        <div class="flex flex-col items-end gap-2">
+            <div class="flex gap-2">
+                <input
+                  type="file"
+                  ref="fileInputRef"
+                  accept=".zip"
+                  class="hidden"
+                  @change="handleFileUpload"
+                />
+                <Button size="sm" variant="outline" @click="triggerUpload" :loading="uploading">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  上传新版本
+                </Button>
+            </div>
+            <div class="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="version-auto-push" 
+                  v-model="autoPush"
+                  class="w-3 h-3 text-accent border-gray-300 rounded focus:ring-accent"
+                >
+                <label for="version-auto-push" class="text-xs text-muted-foreground cursor-pointer">
+                  上传后立即推送
+                </label>
+            </div>
         </div>
       </div>
 
@@ -192,6 +205,7 @@ const activating = ref(null)
 const deliveryDialogVisible = ref(false)
 const currentPackageId = ref(null)
 const fileInputRef = ref(null)
+const autoPush = ref(true)
 
 const triggerUpload = () => {
   fileInputRef.value.click()
@@ -214,6 +228,7 @@ const handleFileUpload = async (e) => {
     uploading.value = true
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('auto_push', autoPush.value ? 'true' : 'false')
     
     const res = await axios.post(`/api/ontologies/${props.ontologyCode}/versions`, formData)
     message.success(`版本 v${res.data.version} 上传成功`)

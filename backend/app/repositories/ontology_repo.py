@@ -90,6 +90,13 @@ class OntologyRepository:
             self.db.delete(package)
             self.db.commit()
 
+    def delete_series(self, code: str):
+        """删除整个本体系列及其下所有内容 (级联)"""
+        series = self.get_series(code)
+        if series:
+            self.db.delete(series)
+            self.db.commit()
+
     def set_active_version(self, series_code: str, package_id: str):
         # 1. 停用该 Series 下的所有历史版本
         self.db.query(models.OntologyPackage).filter(

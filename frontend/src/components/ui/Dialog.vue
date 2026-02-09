@@ -2,7 +2,7 @@
   <Teleport to="body">
     <Transition enter-active-class="transition-opacity duration-300" leave-active-class="transition-opacity duration-200">
       <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm p-4" @click.self="handleOverlayClick">
-        <div :class="dialogClasses" style="max-width: v-bind(width)">
+        <div :class="dialogClasses" :style="{ maxWidth: width }">
           <div v-if="$slots.header || title" class="flex items-center justify-between border-b border-border px-6 py-4">
             <slot name="header">
               <h2 class="text-xl font-semibold text-foreground">{{ title }}</h2>
@@ -34,7 +34,7 @@ const props = defineProps({
   title: String,
   width: { type: String, default: '600px' },
   showClose: { type: Boolean, default: true },
-  closeOnClickModal: { type: Boolean, default: true }
+  closeOnClickModal: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:modelValue', 'close'])

@@ -126,13 +126,45 @@
           placeholder="选择事件类型"
           required
         />
-        <Select
-          v-model="form.ontology_filter"
-          :options="ontologyFilterOptions"
-          label="指定本体"
-          placeholder="默认为所有 (全局)"
-          filterable
-        />
+        <div class="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+          <div class="flex items-center gap-2 mb-1">
+            <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            <label class="text-sm font-bold text-foreground">适用范围 (本体筛选)</label>
+            <button 
+              type="button"
+              @click="isManualCode = !isManualCode" 
+              class="ml-auto flex items-center gap-1 px-2 py-1 rounded bg-accent/10 text-xs font-bold text-accent hover:bg-accent/20 transition-all shadow-sm"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path v-if="!isManualCode" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              {{ isManualCode ? '返回列表选择' : '我要手动输入' }}
+            </button>
+          </div>
+          
+          <div v-if="!isManualCode">
+            <Select
+              v-model="form.ontology_filter"
+              :options="ontologyFilterOptions"
+              class="w-full"
+              placeholder="🔍 搜索并选择已有本体... (留空则订阅所有)"
+              filterable
+            />
+          </div>
+          <div v-else class="animate-fadeIn">
+            <Input 
+              v-model="form.ontology_filter" 
+              placeholder="请输入本体编码 (例如: ontology-core)" 
+              class="font-mono"
+            />
+            <p class="mt-2 text-[11px] text-accent leading-relaxed opacity-80">
+              💡 <strong>小贴士</strong>：手动输入模式允许您订阅尚未创建的本体。一旦未来该编码的本体被上传，推送将自动生效。
+            </p>
+          </div>
+        </div>
         <div>
           <Input
             v-model="form.secret_token"
@@ -209,6 +241,8 @@ const form = reactive({
   secret_token: ''
 })
 
+const isManualCode = ref(false)
+
 const ontologyOptions = ref([])
 
 const eventTypeOptions = [
@@ -216,10 +250,17 @@ const eventTypeOptions = [
 ]
 
 const ontologyFilterOptions = computed(() => {
-  return [
-    { label: '所有本体 (默认)', value: '' },
+  const options = [
+    { label: '所有本体 (全局推送)', value: '' },
     ...ontologyOptions.value
   ]
+  
+  // 如果当前输入的值不在选项中，且不为空，则作为一个临时可选项显示
+  if (form.ontology_filter && !options.find(o => o.value === form.ontology_filter)) {
+    options.push({ label: `手动输入: ${form.ontology_filter}`, value: form.ontology_filter })
+  }
+  
+  return options
 })
 
 const fetchOntologyOptions = async () => {
@@ -277,6 +318,7 @@ const handleAdd = () => {
   form.event_type = 'ontology.activated'
   form.ontology_filter = ''
   form.secret_token = ''
+  isManualCode.value = false
   dialogVisible.value = true
 }
 
@@ -288,10 +330,14 @@ const handleEdit = (row) => {
   form.target_url = row.target_url
   form.event_type = row.event_type
   form.ontology_filter = row.ontology_filter || ''
+  
+  // 如果当前过滤值不在已知列表中，自动切为手动模式
+  const isExisting = ontologyFilterOptions.value.some(o => o.value === row.ontology_filter)
+  isManualCode.value = row.ontology_filter && !isExisting ? true : false
+  
   form.secret_token = row.secret_token || ''
   dialogVisible.value = true
 }
-
 const handleDelete = async (row) => {
   try {
     await showConfirm('确定要删除该订阅吗?', '警告')

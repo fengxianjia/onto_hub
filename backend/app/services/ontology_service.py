@@ -317,7 +317,8 @@ class OntologyService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
 
-    def delete_ontology(self, package_id: str):
+    def delete_version(self, package_id: str):
+        """删除指定版本的本体及物理文件"""
         package = self.onto_repo.get_package(package_id)
         if not package:
             raise HTTPException(status_code=404, detail="Package not found")
@@ -327,7 +328,7 @@ class OntologyService:
             raise HTTPException(status_code=400, detail="正在启用的版本不能删除")
             
         # 安全校验：订阅者正在使用的不能删
-        in_use_ids = self.webhook_service.get_in_use_package_ids(package.series_code) # Use Code
+        in_use_ids = self.webhook_service.get_in_use_package_ids(package.series_code)
         if package.id in in_use_ids:
             raise HTTPException(status_code=400, detail="该版本正在 Webhook 订阅中使用，不能删除")
 
@@ -340,6 +341,31 @@ class OntologyService:
         zip_path = self.get_source_zip_path(package_id)
         if os.path.exists(zip_path):
             os.remove(zip_path)
+
+    def delete_ontology_series(self, code: str):
+        """删除整个本体系列及其所有物理文件 (高危操作)"""
+        series = self.onto_repo.get_series(code)
+        if not series:
+            raise HTTPException(status_code=404, detail="Ontology series not found")
+
+        # 1. 物理清理：删除该系列下所有版本的物理文件
+        packages, _ = self.onto_repo.list_packages(series_code=code, limit=1000)
+        for pkg in packages:
+            storage_path = self._get_storage_path(pkg.id)
+            if os.path.exists(storage_path):
+                shutil.rmtree(storage_path)
+            
+            zip_path = self.get_source_zip_path(pkg.id)
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
+        
+        # 2. 数据库清理：利用 Repository 执行级联删除
+        self.onto_repo.delete_series(code)
+        logger.info(f"Ontology series '{code}' and its {len(packages)} versions have been deleted.")
+
+    def delete_ontology(self, package_id: str):
+        # Backward compatibility alias
+        return self.delete_version(package_id)
 
     def get_source_zip_path(self, package_id: str) -> str:
         # This belongs more to a StorageService but we'll put it here for now

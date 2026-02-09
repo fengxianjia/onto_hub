@@ -76,6 +76,7 @@ async def create_ontology_series(
     name: str = Form(None, description="显示名称"),
     custom_id: str = Form(None, description="自定义版本ID (Optional)"),
     template_id: str = Form(None, description="解析模板 ID"),
+    auto_push: bool = Form(True, description="是否立即推送给订阅者"),
     file: UploadFile = File(..., description="本体 ZIP 包"),
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
@@ -87,12 +88,11 @@ async def create_ontology_series(
 
     package = await service.create_ontology(file, code=code, custom_id=custom_id, name=name, template_id=template_id)
     
-    # Broadcast Webhook
-    _broadcast_activation(package, service, webhook_service, background_tasks)
+    # Broadcast Webhook only if auto_push is True
+    if auto_push:
+        _broadcast_activation(package, service, webhook_service, background_tasks)
     
     # Trigger Parsing Logic
-    # If template_id provided in form, use it.
-    # If not, use the one inherited/saved in package.
     final_template_id = template_id or package.template_id
     if final_template_id:
         background_tasks.add_task(parse_ontology_task, package.id, final_template_id)
@@ -105,6 +105,7 @@ async def add_ontology_version(
     background_tasks: BackgroundTasks,
     custom_id: str = Form(None, description="自定义版本ID (Optional)"),
     template_id: str = Form(None, description="解析模板 ID"),
+    auto_push: bool = Form(True, description="是否立即推送给订阅者"),
     file: UploadFile = File(..., description="本体 ZIP 包"),
     service: OntologyService = Depends(get_ontology_service),
     webhook_service: WebhookService = Depends(get_webhook_service)
@@ -114,21 +115,11 @@ async def add_ontology_version(
     if existing_version == 0:
          raise HTTPException(status_code=404, detail=f"Ontology code '{code}' not found. Use POST /api/ontologies to create it first.")
     
-    # Inherit name from latest version if not provided? 
-    # Service uses file.filename as fallback for name if name is None.
-    # We should probably get the name from the previous version to keep it consistent?
-    # Let's get the active package or latest package to copy the name.
-    # For now, let service handle it (it uses filename).
-    # Ideally, we should pass the existing name.
-    
-    # Get latest package to reuse name?
-    # The service.create_ontology allows name=None.
-    # Get latest package to reuse name?
-    # The service.create_ontology allows name=None.
     package = await service.create_ontology(file, code=code, custom_id=custom_id, name=None, template_id=template_id)
     
-    # Broadcast Webhook
-    _broadcast_activation(package, service, webhook_service, background_tasks)
+    # Broadcast Webhook only if auto_push is True
+    if auto_push:
+        _broadcast_activation(package, service, webhook_service, background_tasks)
     
     # Trigger Parsing Logic
     final_template_id = template_id or package.template_id
@@ -301,7 +292,19 @@ def delete_ontology_version(
     - 不能删除当前激活的版本
     - 不能删除被 Webhook 订阅引用的版本
     """
-    service.delete_ontology(id)
+    service.delete_version(id)
+    return None
+
+@app.delete("/api/ontologies/by-code/{code}", status_code=204)
+def delete_ontology_series(
+    code: str,
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """
+    **删除整个本体系列 (高危)**
+    - 删除所有版本记录、文件及物理存储
+    """
+    service.delete_ontology_series(code)
     return None
 
 @app.get("/api/ontologies/compare", response_model=schemas.OntologyComparisonResponse)
