@@ -139,9 +139,28 @@ graph TB
 
 ---
 
-## 5. 安全性设计 (Security)
+## 6. 管理与重析设计 (Management & Re-parsing)
+
+### 6.1 系列管理 (Series Management)
+*   **元数据更新**: `PATCH /api/ontologies/{code}`
+    *   允许更新 `name`, `description` 以及 `default_template_id`。
+    *   **继承机制**: 修改 `default_template_id` 后，新上传的本体包将自动继承该模板。
+
+### 6.2 数据重析 (Data Re-parsing)
+*   **按需触发**: `POST /api/ontologies/packages/{id}/reparse`
+    *   **输入**: 可选 `template_id`。
+    *   **处理流**:
+        1. 清空目标版本在 `ontology_entities` 和 `ontology_relations` 中的所有记录。
+        2. 发起异步 `parse_ontology_task`。
+        3. 重析使用的是当前选定的模板（或系列默认模板），不改动其他版本。
+    *   **前端引导**: 重析成功后，前端详情页会自动切换至“知识图谱”或“实体”视图，向用户展示刷新后的数据。
+
+---
+
+## 7. 安全性设计 (Security)
 
 1.  **Zip Slip 防护**: 在解压 ZIP 包时，严格检查 `zip_info.filename`，防止 `../../` 路径遍历攻击覆盖系统文件。
 2.  **路径隔离**: 所有上传文件强制存储在 `backend/data/ontology_storage/{uuid}/` 目录下，物理隔离。
 3.  **输入校验**: 使用 Pydantic (Schemas) 对所有 API 输入进行严格的数据类型和格式校验。
 4.  **SQL 注入防护**: 使用 SQLAlchemy ORM，自动参数化查询，杜绝 SQL 注入风险。
+5.  **组件命名防御**: 前端自定义组件统一使用 `UI` 前缀 (如 `UISelect`)，防止与 HTML5 原生标签名产生渲染冲突。
