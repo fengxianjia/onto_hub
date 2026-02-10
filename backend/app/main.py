@@ -642,29 +642,6 @@ def get_ontology_relations(
     """
     return service.list_relations(id, skip, limit)
 
-# Static Mounting Logic
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DIST_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
-
-if os.path.exists(DIST_DIR):
-    app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
-    
-    @app.get(
-        "/{full_path:path}",
-        summary="静态资源服务 (前端入口)",
-        description="负责交付 Vue 编译后的静态资源文件，并为单页应用（SPA）提供路由保底机制。",
-        tags=["System"]
-    )
-    async def serve_frontend(full_path: str):
-        if full_path.startswith("api"):
-             raise HTTPException(status_code=404, detail="Not Found")
-        
-        possible_file = os.path.join(DIST_DIR, full_path)
-        if os.path.exists(possible_file) and os.path.isfile(possible_file):
-            return FileResponse(possible_file)
-            
-        return FileResponse(os.path.join(DIST_DIR, "index.html"))
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
