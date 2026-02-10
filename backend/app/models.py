@@ -143,6 +143,7 @@ class ParsingTemplate(Base):
     id = Column(String, primary_key=True, default=generate_uuid, index=True)
     name = Column(String, unique=True, index=True, nullable=False, comment="模板名称")
     description = Column(String, nullable=True, comment="描述")
+    parser_type = Column(String, default="markdown", nullable=False, comment="解析器类型 (markdown/owl)")
     rules = Column(Text, nullable=False, comment="解析规则(JSON)")
     created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
     

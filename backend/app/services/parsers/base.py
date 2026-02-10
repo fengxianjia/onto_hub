@@ -14,9 +14,9 @@ class BaseParser(ABC):
         pass
 
     @abstractmethod
-    def parse(self, file_record: OntologyFile, content: str, rules: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+    def parse(self, file_record: OntologyFile, content: str, rules: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        解析文件内容
+        解析文件内容并返回实体记录列表
         
         Args:
             file_record: 数据库中的文件记录对象
@@ -24,8 +24,11 @@ class BaseParser(ABC):
             rules: 解析模板规则字典
             
         Returns:
-            Tuple[metadata, wikilinks]: 
-                - metadata: 提取出的属性字典 (将存入 metadata_json)
-                - wikilinks: 提取出的 Wiki 链接列表 (用于构建关系)
+            List[Dict]: 实体记录列表。每个字典应包含:
+                - metadata (Dict): 提取出的属性字典
+                - links (List[str]): 提取出的关系目标名称或 URI 列表
+                - body (str): 提取出的主体内容 (可选)
+                - name (str): 显式指定的实体名称 (可选, 插件可覆盖核心命名逻辑)
+                - category (str): 显式指定的实体类别 (可选)
         """
         pass

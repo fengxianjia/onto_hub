@@ -13,7 +13,7 @@ class MarkdownParser(BaseParser):
     def supported_extensions(self) -> List[str]:
         return ['.md', '.markdown']
 
-    def parse(self, file_record: OntologyFile, content: str, rules: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+    def parse(self, file_record: OntologyFile, content: str, rules: Dict[str, Any]) -> List[Dict[str, Any]]:
         # 1. 解析 Frontmatter
         metadata, body = self._parse_frontmatter(content)
         
@@ -35,7 +35,12 @@ class MarkdownParser(BaseParser):
         # 按照现有逻辑，Service 需要 entity_name 和 category_name，这部分由 Service 统一处理
         # 插件只负责从内容中“抠”出结构化数据
         
-        return final_metadata, links, body
+        # 返回列表格式以支持多实体扩展 (虽然 Markdown 通常一个文件对应一个实体)
+        return [{
+            "metadata": final_metadata,
+            "links": links,
+            "body": body
+        }]
 
     def _parse_frontmatter(self, content: str):
         if content.startswith("---\n"):

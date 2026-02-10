@@ -110,6 +110,7 @@ class OntologyComparisonResponse(BaseModel):
 class ParsingTemplateBase(BaseModel):
     name: str
     description: Optional[str] = None
+    parser_type: str = "markdown"
     rules: str # JSON string
 
 class ParsingTemplateCreate(ParsingTemplateBase):

@@ -67,7 +67,7 @@ const selectOption = (option) => {
 }
 
 const selectClasses = computed(() => {
-  const base = 'relative w-full h-12 px-4 text-left border border-border rounded-lg bg-transparent text-foreground transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between'
+  const base = 'relative w-full h-12 px-4 text-left border border-border rounded-lg bg-background text-foreground transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60 disabled:bg-muted/80 disabled:text-muted-foreground disabled:cursor-not-allowed flex items-center justify-between shadow-sm'
   return cn(base, props.error ? 'border-red-500' : '')
 })
 

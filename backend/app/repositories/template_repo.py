@@ -19,6 +19,7 @@ class TemplateRepository:
         db_template = models.ParsingTemplate(
             name=template.name,
             description=template.description,
+            parser_type=template.parser_type,
             rules=template.rules
         )
         self.db.add(db_template)
@@ -45,6 +46,7 @@ class TemplateRepository:
             
         db_template.name = template.name
         db_template.description = template.description
+        db_template.parser_type = template.parser_type
         db_template.rules = template.rules
         
         self.db.commit()

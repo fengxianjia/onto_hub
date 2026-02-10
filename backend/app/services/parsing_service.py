@@ -92,38 +92,39 @@ class ParsingService:
             parser = self._parsers.get(ext)
             
             if not parser:
-                # logger.debug(f"No parser found for extension {ext}, skipping {file_record.file_path}")
                 continue
                 
             try:
-                with open(full_path, 'r', encoding='utf-8') as f:
+                with open(full_path, 'r', encoding='utf-8-sig') as f:
                     content = f.read()
                 
-                # 调用插件解析
-                # 调整后的插件接口返回: (metadata, links, body)
-                metadata, links, body = parser.parse(file_record, content, rules)
+                # 插件现在返回实体记录列表 [{'metadata': ..., 'links': ..., 'name': ...}, ...]
+                parsed_entities = parser.parse(file_record, content, rules)
                 
-                # 核心 Service 统一提取 Entity 基础信息 (Name, Category)
-                # 这样插件可以专注于“抠内容”，而命名规则保持在核心掌控下
-                entity_name = self._extract_entity_name(file_record, metadata, entity_rules)
-                entity_category = self._extract_category(file_record, metadata, entity_rules)
-                
-                entity = OntologyEntity(
-                    package_id=package_id,
-                    name=entity_name,
-                    category=entity_category,
-                    metadata_json=json.dumps(metadata, ensure_ascii=False),
-                    file_path=file_record.file_path
-                )
-                entity.id = models.generate_uuid()
-                
-                entities_to_add.append(entity)
-                name_to_id_map[entity_name] = entity.id
-                
-                parsed_results.append({
-                    "entity_id": entity.id,
-                    "links": links
-                })
+                for record in parsed_entities:
+                    metadata = record.get("metadata", {})
+                    links = record.get("links", [])
+                    
+                    # 确定实体名称：插件显式指定优先，否则用核心规则提取
+                    entity_name = record.get("name") or self._extract_entity_name(file_record, metadata, entity_rules)
+                    entity_category = record.get("category") or self._extract_category(file_record, metadata, entity_rules)
+                    
+                    entity = OntologyEntity(
+                        package_id=package_id,
+                        name=entity_name,
+                        category=entity_category,
+                        metadata_json=json.dumps(metadata, ensure_ascii=False),
+                        file_path=file_record.file_path
+                    )
+                    entity.id = models.generate_uuid()
+                    
+                    entities_to_add.append(entity)
+                    name_to_id_map[entity_name] = entity.id
+                    
+                    parsed_results.append({
+                        "entity_id": entity.id,
+                        "links": links
+                    })
             except Exception as e:
                 logger.error(f"Error parsing file {file_record.file_path} with {parser.__class__.__name__}: {e}")
 
