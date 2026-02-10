@@ -73,6 +73,12 @@ class OntologyRepository:
             models.OntologyPackage.is_active == True
         ).first()
 
+    def get_latest_package_by_code(self, code: str) -> Optional[models.OntologyPackage]:
+        """获取特定系列下版本号最高的一个包"""
+        return self.db.query(models.OntologyPackage).filter(
+            models.OntologyPackage.series_code == code
+        ).order_by(models.OntologyPackage.version.desc()).first()
+
     def get_latest_version(self, code: str) -> int:
         # Use series_code to find the latest version
         latest = self.db.query(models.OntologyPackage).filter(

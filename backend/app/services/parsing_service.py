@@ -14,6 +14,12 @@ class ParsingService:
     def __init__(self, db: Session):
         self.db = db
 
+    @property
+    def storage_dir(self) -> str:
+        """Dynamically get storage directory from settings."""
+        from ..config import settings
+        return settings.STORAGE_DIR
+
     def _extract_attributes(self, content: str, rules: dict) -> dict:
         attributes = {}
         attr_rules = rules.get("attribute", {})
@@ -127,7 +133,7 @@ class ParsingService:
         entity_rules = rules.get("entity", {})
         
         name_to_id_map = {} 
-        base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "ontohub_storage", package_id)
+        base_dir = os.path.join(self.storage_dir, package_id)
 
         files = self.db.query(OntologyFile).filter(OntologyFile.package_id == package_id).all()
         

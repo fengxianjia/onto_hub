@@ -11,17 +11,18 @@ from datetime import datetime, UTC
 from .config import settings
 from .core.logging import setup_logging
 
-# 立即初始化统一日志
-setup_logging()
-
 from .core.errors import BusinessException, BusinessCode, handle_result
 from fastapi.responses import JSONResponse
 
 from . import models, schemas, database, utils
 
-# 确保所有模型已加载，并自动创建数据库表 (如果不存在)
-# 这一步必须在任何数据库查询发生之前执行
-models.Base.metadata.create_all(bind=database.engine)
+# 数据库初始化函数
+def init_db():
+    models.Base.metadata.create_all(bind=database.engine)
+
+# 在非测试环境下自动初始化
+if settings.ENV != "test":
+    init_db()
 from .repositories.ontology_repo import OntologyRepository
 from .repositories.webhook_repo import WebhookRepository
 from .services.ontology_service import OntologyService
@@ -30,9 +31,12 @@ from .tasks import parse_ontology_task
 from .core.middleware import LoggingMiddleware
 from .routers import templates
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import logging
+    # Initialize logging during application startup
+    setup_logging()
     logging.info("FastAPI application is starting up...")
     yield
 
@@ -67,6 +71,14 @@ async def business_exception_handler(request: Request, exc: BusinessException):
     )
 
 def get_db():
+    # Use the SessionLocal factory which now includes a test-environment guard
+    # The dependency_overrides in conftest.py should prevent this from being executed during tests
+    import os
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        # This branch SHOULD NOT reach SessionLocal() if overrides are working
+        # If it does, it's a critical failure in the test setup
+        pass
+        
     db = database.SessionLocal()
     try:
         yield db
@@ -115,7 +127,7 @@ async def create_ontology_series(
     # Trigger Parsing Logic
     final_template_id = template_id or package.template_id
     if final_template_id:
-        background_tasks.add_task(parse_ontology_task, package.id, final_template_id)
+        background_tasks.add_task(parse_ontology_task, package.id, final_template_id, db=service.onto_repo.db)
         
     return package_resp
 
@@ -148,7 +160,7 @@ async def add_ontology_version(
     # Trigger Parsing Logic
     final_template_id = template_id or package.template_id
     if final_template_id:
-        background_tasks.add_task(parse_ontology_task, package.id, final_template_id)
+        background_tasks.add_task(parse_ontology_task, package.id, final_template_id, db=service.onto_repo.db)
         
     return package_resp
 
@@ -187,7 +199,7 @@ async def reparse_ontology(
     result = await service.reparse_ontology_package(package_id, template_id)
     final_template_id = handle_result(result)
     
-    background_tasks.add_task(parse_ontology_task, package_id, final_template_id)
+    background_tasks.add_task(parse_ontology_task, package_id, final_template_id, db=service.onto_repo.db)
     return {"message": "Parsing task triggered", "template_id": final_template_id}
 
 def _broadcast_activation(package, service, webhook_service, background_tasks):
@@ -207,7 +219,8 @@ def _broadcast_activation(package, service, webhook_service, background_tasks):
         payload=payload,
         ontology_name=package.code, # Use Code for strict filtering
         background_tasks=background_tasks,
-        file_path=service.get_source_zip_path(package.id)
+        file_path=service.get_source_zip_path(package.id),
+        db=service.onto_repo.db
     )
 
 @app.post("/api/webhooks", response_model=schemas.WebhookResponse, status_code=201)

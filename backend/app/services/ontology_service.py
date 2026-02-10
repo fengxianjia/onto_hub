@@ -18,15 +18,20 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 
-# 配置存储路径: app/services/ontology_service.py -> backend/data/ontology_storage
-BASE_STORAGE_DIR = settings.STORAGE_DIR
-os.makedirs(BASE_STORAGE_DIR, exist_ok=True)
+# OntologyService will use settings.STORAGE_DIR via dynamic property
 
 class OntologyService:
     def __init__(self, onto_repo: OntologyRepository, webhook_repo: WebhookRepository, webhook_service: 'WebhookService' = None):
         self.onto_repo = onto_repo
         self.webhook_repo = webhook_repo
         self.webhook_service = webhook_service
+
+    @property
+    def storage_dir(self) -> str:
+        """Dynamically get storage directory from settings."""
+        path = settings.STORAGE_DIR
+        os.makedirs(path, exist_ok=True)
+        return path
 
     async def update_ontology_series(self, code: str, series_in: schemas.OntologySeriesUpdate) -> ServiceResult[models.OntologySeries]:
         series = self.onto_repo.get_series(code)
@@ -62,7 +67,7 @@ class OntologyService:
         return ServiceResult.success_result(final_template_id)
 
     def _get_storage_path(self, package_id: str) -> str:
-        return os.path.join(BASE_STORAGE_DIR, package_id)
+        return os.path.join(self.storage_dir, package_id)
 
     def _decode_zip_path(self, raw_path: str) -> str:
         """
@@ -124,7 +129,7 @@ class OntologyService:
                 )
 
         # 保存文件并创建记录
-        temp_zip = os.path.join(BASE_STORAGE_DIR, f"temp_{datetime.now().timestamp()}.zip")
+        temp_zip = os.path.join(self.storage_dir, f"temp_{datetime.now().timestamp()}.zip")
         async with aiofiles.open(temp_zip, 'wb') as out_file:
             content = await file.read()
             await out_file.write(content)
@@ -454,7 +459,7 @@ class OntologyService:
     def get_source_zip_path(self, package_id: str) -> str:
         # This belongs more to a StorageService but we'll put it here for now
         # Actually manager.py had a simple logic for this
-        return os.path.join(BASE_STORAGE_DIR, f"{package_id}.zip") # Wait, manager.py just returned a path
+        return os.path.join(self.storage_dir, f"{package_id}.zip") # Wait, manager.py just returned a path
 
     def list_relations(self, package_id: str, skip: int = 0, limit: int = 100) -> schemas.PaginatedOntologyRelationResponse:
         items, total = self.onto_repo.get_relations(package_id, skip, limit)

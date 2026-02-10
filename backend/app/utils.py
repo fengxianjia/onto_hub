@@ -6,13 +6,18 @@ import asyncio
 import hmac
 import hashlib
 import time
+from sqlalchemy.orm import Session
 from . import models, database
 
 logger = logging.getLogger(__name__)
 
-async def _save_delivery_log(webhook_id, event_type, ontology_name, payload, status, response_status, error_message):
-    try:
+async def _save_delivery_log(webhook_id, event_type, ontology_name, payload, status, response_status, error_message, db: Session = None):
+    should_close = False
+    if db is None:
         db = database.SessionLocal()
+        should_close = True
+        
+    try:
         delivery = models.WebhookDelivery(
             webhook_id=webhook_id,
             event_type=event_type,
@@ -27,7 +32,8 @@ async def _save_delivery_log(webhook_id, event_type, ontology_name, payload, sta
     except Exception as db_e:
         logger.error(f"Failed to save webhook log: {db_e}")
     finally:
-        db.close()
+        if should_close:
+            db.close()
 
 async def send_webhook_request(
     target_url: str, 
@@ -37,7 +43,8 @@ async def send_webhook_request(
     file_path: str = None, 
     save_log: bool = True,
     secret_token: str = None,
-    ontology_name: str = None
+    ontology_name: str = None,
+    db: Session = None
 ):
     """
     异步发送 Webhook 请求并记录日志 (支持重试、签名、优化日志)
@@ -67,7 +74,7 @@ async def send_webhook_request(
         logger.error(error_message)
         # 记录失败日志并返回
         if save_log:
-            await _save_delivery_log(webhook_id, event_type, ontology_name, payload, "FAILURE", None, error_message)
+            await _save_delivery_log(webhook_id, event_type, ontology_name, payload, "FAILURE", None, error_message, db=db)
         return
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
@@ -107,7 +114,8 @@ async def send_webhook_request(
                 payload=payload,
                 status=status,
                 response_status=response_status,
-                error_message=error_message
+                error_message=error_message,
+                db=db
             )
         
     return {

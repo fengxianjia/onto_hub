@@ -131,10 +131,11 @@ class TestOntologyServiceFileManagement:
         repo = Mock()
         webhook_repo = Mock()
         webhook_service = Mock()
-        service = OntologyService(repo, webhook_repo, webhook_service)
         
-        # Mock the storage base path
-        with patch('app.services.ontology_service.BASE_STORAGE_DIR', str(temp_storage_dir)):
+        from app.config import settings
+        with patch.object(settings, 'STORAGE_DIR', str(temp_storage_dir)):
+            service = OntologyService(repo, webhook_repo, webhook_service)
+            
             path1 = service._get_storage_path("pkg-id-1")
             path2 = service._get_storage_path("pkg-id-2")
             
@@ -147,7 +148,10 @@ class TestOntologyServiceFileManagement:
         repo = Mock()
         webhook_repo = Mock()
         webhook_service = Mock()
-        service = OntologyService(repo, webhook_repo, webhook_service)
+        
+        from app.config import settings
+        with patch.object(settings, 'STORAGE_DIR', str(temp_storage_dir)):
+            service = OntologyService(repo, webhook_repo, webhook_service)
         
         # Create a fake package directory
         pkg_dir = temp_storage_dir / "test-package-id"
@@ -156,13 +160,13 @@ class TestOntologyServiceFileManagement:
         
         assert pkg_dir.exists()
         
-        # Cleanup (Manual check of shutils.rmtree)
-        with patch('app.services.ontology_service.BASE_STORAGE_DIR', str(temp_storage_dir)):
-            # Package needs to NOT be active to be deletable
-            repo.get_package.return_value = Mock(id="test-package-id", is_active=False, series_code="any")
-            # Mock webhook check to not block deletion
-            with patch.object(service.webhook_service, 'get_in_use_package_ids', return_value=[]):
-                service.delete_version("test-package-id")
+        # Cleanup
+        # Package needs to NOT be active to be deletable
+        repo.get_package.return_value = Mock(id="test-package-id", is_active=False, series_code="any")
+        # Mock webhook check to not block deletion
+        with patch.object(service.webhook_service, 'get_in_use_package_ids', return_value=[]):
+            service.delete_version("test-package-id")
         
         # Directory should be removed
         assert not pkg_dir.exists()
+        assert not (temp_storage_dir / "pkg-id-1").exists() # Just a reminder that we use storage_dir now

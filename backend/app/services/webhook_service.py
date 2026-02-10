@@ -1,6 +1,7 @@
 import logging
 import json
 from typing import List, Optional
+from sqlalchemy.orm import Session
 from ..repositories.webhook_repo import WebhookRepository
 from .. import schemas, utils
 from ..core.results import ServiceResult, ServiceStatus
@@ -152,7 +153,7 @@ class WebhookService:
         except Exception as e:
             return ServiceResult.failure_result(ServiceStatus.FAILURE, str(e))
 
-    def broadcast_event(self, event_type: str, payload: dict, ontology_name: str, background_tasks, file_path: str = None):
+    def broadcast_event(self, event_type: str, payload: dict, ontology_name: str, background_tasks, file_path: str = None, db: Session = None):
         """Find matching webhooks and add broadcast task to background_tasks."""
         webhooks = self.repo.get_webhooks_by_event(event_type, ontology_name=ontology_name)
         
@@ -165,7 +166,8 @@ class WebhookService:
                 "event_type": event_type,
                 "file_path": file_path,
                 "secret_token": wh.secret_token,
-                "ontology_name": ontology_name
+                "ontology_name": ontology_name,
+                "db": db
             })
 
         if webhook_requests:
