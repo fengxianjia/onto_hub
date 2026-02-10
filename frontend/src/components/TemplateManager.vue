@@ -3,16 +3,18 @@
     <!-- Header -->
     <Card variant="flat" class="mb-0 overflow-visible">
       <div class="flex justify-between items-center py-2 px-1">
-        <h2 class="text-2xl font-bold text-foreground">解析模板管理</h2>
+        <div class="flex items-center gap-3">
+          <h2 class="text-2xl font-bold text-foreground">解析模板管理</h2>
+          <Button variant="ghost" size="sm" @click="showGuide = !showGuide" :class="['transition-colors p-1', showGuide ? 'text-accent bg-accent/10 shadow-inner' : 'text-muted-foreground hover:text-foreground']" title="配置指南">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </Button>
+        </div>
         <div class="flex gap-3">
           <Button variant="ghost" size="sm" @click="fetchTemplates" title="刷新">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </Button>
-          <Button variant="ghost" size="sm" @click="showGuide = !showGuide" :class="['transition-colors', showGuide ? 'text-accent bg-accent/10' : 'text-muted-foreground hover:text-foreground']" title="配置指南">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
           </Button>
           <Button variant="primary" size="sm" @click="openDialog()">
@@ -28,60 +30,64 @@
     <!-- Usage Guide -->
     <Card v-if="showGuide" variant="flat" class="bg-muted/30 border-dashed border-2 animate-in fade-in slide-in-from-top-2">
       <div class="space-y-3">
-        <h3 class="font-bold flex items-center gap-2 text-foreground">
-          <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          模板配置指南
+        <h3 class="font-bold flex items-center gap-2 text-foreground text-base">
+          配置指南
         </h3>
-        <p class="text-sm text-muted-foreground">解析模板用于告诉系统如何从 Markdown 文件中提取实体和关系。默认假设<b>一个文件代表一个实体</b>。</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+        <p class="text-sm text-muted-foreground leading-relaxed">解析模板定义了系统如何从本体文件中提取知识。系统支持 <b>Markdown (单文档单实体)</b> 与 <b>OWL/RDF (复合本体多实体)</b> 两种模式。</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm mt-4">
           <div>
-            <h4 class="font-semibold mb-2 text-foreground">1. 实体识别 (Entity)</h4>
-            <ul class="list-disc list-inside space-y-1 text-muted-foreground">
-              <li><code class="bg-muted px-1 rounded text-foreground">name_source</code>: 实体名称来源
-                <ul class="pl-5 mt-1 list-none text-xs space-y-1">
-                  <li>• "filename_no_ext": 使用文件名 (默认, e.g. <code>User.md</code> → User)</li>
-                  <li>• "frontmatter:title": 使用 YAML 头部的 title 字段</li>
+            <h4 class="font-semibold mb-3 text-foreground border-l-4 border-accent pl-2">1. 实体识别 (Entity)</h4>
+            <ul class="list-disc list-inside space-y-2 text-muted-foreground">
+              <li><code class="bg-muted px-1 rounded text-foreground">name_source</code>: 名称来源规则
+                <ul class="pl-6 mt-1 list-none text-xs space-y-1">
+                  <li>• <b class="text-foreground">Markdown</b>: "filename_no_ext" (文件名) 或 "frontmatter:title"</li>
+                  <li>• <b class="text-foreground">OWL/RDF</b>: 默认提取 <code>rdfs:label</code>，不存在则回退至 URI 片段</li>
                 </ul>
               </li>
-              <li><code class="bg-muted px-1 rounded text-foreground">category_source</code>: 实体分类来源
-                <ul class="pl-5 mt-1 list-none text-xs space-y-1">
-                  <li>• "directory": 使用所在文件夹名 (默认, e.g. <code>Models/User.md</code> → Models)</li>
-                  <li>• "frontmatter:type": 使用 YAML 头部的 type 字段</li>
+              <li><code class="bg-muted px-1 rounded text-foreground">category_source</code>: 分类来源规则
+                <ul class="pl-6 mt-1 list-none text-xs space-y-1">
+                  <li>• <b class="text-foreground">Markdown</b>: "directory" (文件夹) 或 "frontmatter:type"</li>
+                  <li>• <b class="text-foreground">OWL/RDF</b>: 自动识别 <code>rdf:type</code> (如 Class, Property)</li>
                 </ul>
               </li>
             </ul>
           </div>
           <div>
-            <h4 class="font-semibold mb-2 text-foreground">2. 关系提取 (Relation)</h4>
-            <ul class="list-disc list-inside space-y-1 text-muted-foreground">
-              <li><code class="bg-muted px-1 rounded text-foreground">strategies</code>: 提取策略列表
-                <ul class="pl-5 mt-1 list-none text-xs space-y-1">
-                  <li>• "wikilink": 支持 <code>[[EntityName]]</code> 语法自动建立关系</li>
+            <h4 class="font-semibold mb-3 text-foreground border-l-4 border-accent pl-2">2. 关系提取 (Relation)</h4>
+            <ul class="list-disc list-inside space-y-2 text-muted-foreground">
+              <li><code class="bg-muted px-1 rounded text-foreground">strategies</code>: 提取策略
+                <ul class="pl-6 mt-1 list-none text-xs space-y-1">
+                  <li>• <b class="text-foreground">Markdown</b>: "wikilink" (<code>[[链接]]</code>) 自动建立关联</li>
+                  <li>• <b class="text-foreground">OWL/RDF</b>: 自动提取所有具名 ObjectProperty 及其对应的关系</li>
                 </ul>
               </li>
             </ul>
           </div>
           <div class="md:col-span-2">
-            <h4 class="font-semibold mb-2 text-foreground">3. 属性提取 (Attribute)</h4>
-             <ul class="list-disc list-inside space-y-1 text-muted-foreground">
-              <li><code class="bg-muted px-1 rounded text-foreground">regex_patterns</code>: 正则表达式提取规则列表
-                <ul class="pl-5 mt-1 list-none text-xs space-y-1">
-                  <li>• <code>key</code>: 属性名</li>
-                  <li>• <code>pattern</code>: 正则表达式 (使用捕获组 <code>()</code> 提取值)</li>
-                </ul>
-              </li>
-              <li><code class="bg-muted px-1 rounded text-foreground">strategies</code>: 高级提取策略列表
-                <ul class="pl-5 mt-1 list-none text-xs space-y-1">
-                  <li>• <code>type="table_row"</code>: 提取表格行作为对象列表</li>
-                  <li>• <code>target_key</code>: 结果存储字段</li>
-                  <li>• <code>header_mapping</code>: 解析后的属性映射</li>
-                </ul>
-              </li>
+            <h4 class="font-semibold mb-3 text-foreground border-l-4 border-accent pl-2">3. 属性提取 (Attribute)</h4>
+             <ul class="list-disc list-inside space-y-2 text-muted-foreground">
+              <li><code class="bg-muted px-1 rounded text-foreground">regex_patterns</code>: 正则规则 (Markdown)</li>
+              <li><code class="bg-muted px-1 rounded text-foreground">strategies</code>: 映射策略 (支持逻辑表格解析)</li>
             </ul>
-            <div class="mt-4">
-                <h4 class="font-semibold mb-2 text-foreground">示例配置:</h4>
-                <div class="relative group">
-                    <pre class="bg-muted p-3 rounded-md text-xs font-mono overflow-x-auto text-foreground border border-border">{{ JSON.stringify(defaultRules, null, 2) }}</pre>
+            <div class="mt-8 p-6 rounded-2xl bg-white/50 border border-border shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-start gap-8">
+                  <div>
+                    <h4 class="font-bold text-sm text-foreground flex items-center gap-2">
+                       <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0L8 8m4-4v12"></path></svg>
+                       示例配置参考
+                    </h4>
+                    <p class="text-xs text-muted-foreground mt-1">下载标准配置模板以供快速参考与导入。</p>
+                  </div>
+                  <div class="flex gap-4">
+                    <Button variant="ghost" size="sm" class="text-blue-600 hover:bg-blue-50 font-semibold transition-all flex items-center gap-1.5" @click="downloadExample('markdown')">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg>
+                      Markdown 示例
+                    </Button>
+                    <Button variant="ghost" size="sm" class="text-indigo-600 hover:bg-indigo-50 font-semibold transition-all flex items-center gap-1.5" @click="downloadExample('owl')">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg>
+                      OWL/RDF 示例
+                    </Button>
+                  </div>
                 </div>
             </div>
           </div>
@@ -351,7 +357,7 @@ const defaultRulesMarkdown = {
   attribute: { regex_patterns: [], strategies: [] }
 }
 
-const defaultRulesOWL = {
+const defaultRulesOwl = {
   entity: { name_source: "metadata:name", category_source: "metadata:type" },
   relation: { strategies: ["owl_subclass"] },
   attribute: { regex_patterns: [], strategies: [] }
@@ -490,6 +496,17 @@ const handleDelete = async (template) => {
     showMessage('删除成功', 'success')
     fetchTemplates()
   } catch (error) { if (error !== 'cancel') showMessage(message.getErrorMessage(error, '删除失败'), 'error') }
+}
+
+const downloadExample = (type) => {
+  const rules = type === 'owl' ? defaultRulesOwl : defaultRulesMarkdown
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rules, null, 2))
+  const downloadAnchorNode = document.createElement('a')
+  downloadAnchorNode.setAttribute("href", dataStr)
+  downloadAnchorNode.setAttribute("download", `template_${type}_example.json`)
+  document.body.appendChild(downloadAnchorNode)
+  downloadAnchorNode.click()
+  document.body.removeChild(downloadAnchorNode)
 }
 
 const addRegexPattern = () => {
