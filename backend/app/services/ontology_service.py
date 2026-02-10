@@ -83,18 +83,43 @@ class OntologyService:
             return raw_path
 
     def _safe_extract(self, zip_ref: zipfile.ZipFile, extract_path: str):
-        for member in zip_ref.namelist():
-            # 修正路径编码
-            decoded_member = self._decode_zip_path(member)
-            filename = os.path.basename(decoded_member)
-            if not filename:
+        """
+        带安全校验的解压逻辑：
+        1. 防御 Zip Slip (路径遍历)
+        2. 防御 ZIP 炸弹 (限制总大小和文件数量)
+        """
+        MAX_FILE_COUNT = 1000
+        MAX_TOTAL_SIZE = 500 * 1024 * 1024  # 500MB
+        
+        total_size = 0
+        file_count = 0
+        
+        # 预检查文件数量
+        infolist = zip_ref.infolist()
+        if len(infolist) > MAX_FILE_COUNT:
+            raise ValueError(f"压缩包内文件数量过多 (上限 {MAX_FILE_COUNT})")
+
+        for member in infolist:
+            # 修正路径编码并防御 Zip Slip
+            decoded_member = self._decode_zip_path(member.filename)
+            
+            # 使用 os.path.abspath 进行归一化路径校验
+            target_path = os.path.abspath(os.path.join(extract_path, decoded_member))
+            if not target_path.startswith(os.path.abspath(extract_path)):
+                logger.warning(f"检测到潜在的路径遍历攻击 (Zip Slip): {member.filename}")
                 continue
             
-            # 使用修正后的路径
-            target_path = os.path.normpath(os.path.join(extract_path, decoded_member))
-            if not target_path.startswith(os.path.normpath(extract_path)):
-                logger.warning(f"Zip Slip attempt blocked: {member}")
+            # 过滤目录项，只处理文件
+            if member.is_dir():
+                os.makedirs(target_path, exist_ok=True)
                 continue
+
+            # 统计总大小并防御 ZIP 炸弹
+            total_size += member.file_size
+            if total_size > MAX_TOTAL_SIZE:
+                raise ValueError(f"解压后总大小超过限制 (上限 {MAX_TOTAL_SIZE // (1024*1024)}MB)")
+            
+            file_count += 1
             
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             with zip_ref.open(member) as source, open(target_path, "wb") as target:

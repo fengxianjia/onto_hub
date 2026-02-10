@@ -184,6 +184,7 @@ import axios from 'axios'
 import { Drawer, Card, Badge, Button, Loading, Empty, Pagination } from './index.js'
 import DeliveryStatusDialog from './DeliveryStatusDialog.vue'
 import { message, showConfirm } from '../utils/message.js'
+import { formatDate } from '../utils/format.js'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -313,17 +314,7 @@ const getStatusVariant = (status) => {
   return map[status] || 'default'
 }
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+
 
 // Version selection for comparison
 const selectedVersions = ref([])

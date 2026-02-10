@@ -185,7 +185,7 @@ const unchangedCount = computed(() => fileDiff.value.filter(f => f.status === 'u
 
 // Search and Filter
 const searchQuery = ref('')
-const activeFilters = ref([])
+const activeFilters = ref(['added', 'deleted', 'modified'])
 
 const statusFilters = [
   { value: 'added', label: '新增' },
@@ -234,10 +234,10 @@ const fetchVersionDiff = async () => {
     })
     fileDiff.value = res.data.files || []
     
-    // Auto-select first modified file
-    const firstModified = fileDiff.value.find(f => f.status === 'modified')
-    if (firstModified) {
-      viewFileDiff(firstModified)
+    // Auto-select first modified/added/deleted file
+    const firstChange = fileDiff.value.find(f => f.status !== 'unchanged')
+    if (firstChange) {
+      viewFileDiff(firstChange)
     }
   } catch (error) {
     showMessage('获取版本差异失败', 'error')
@@ -246,59 +246,13 @@ const fetchVersionDiff = async () => {
   }
 }
 
-const viewFileDiff = async (change) => {
-  try {
-    console.log('Viewing file diff:', change)
-    
-    // For deleted files, only fetch old content
-    if (change.status === 'deleted') {
-      const oldContentRes = await axios.get(`/api/ontologies/${props.oldVersion.id}/files`, {
-        params: { path: change.file_path }
-      })
-      selectedFileDiff.value = {
-        path: change.file_path,
-        status: change.status,
-        oldContent: oldContentRes.data.content || oldContentRes.data || '',
-        newContent: ''
-      }
-      return
-    }
-    
-    // For added files, only fetch new content
-    if (change.status === 'added') {
-      const newContentRes = await axios.get(`/api/ontologies/${props.newVersion.id}/files`, {
-        params: { path: change.file_path }
-      })
-      selectedFileDiff.value = {
-        path: change.file_path,
-        status: change.status,
-        oldContent: '',
-        newContent: newContentRes.data.content || newContentRes.data || ''
-      }
-      return
-    }
-    
-    // For modified and unchanged files, fetch both
-    const [newContentRes, oldContentRes] = await Promise.all([
-      axios.get(`/api/ontologies/${props.newVersion.id}/files`, {
-        params: { path: change.file_path }
-      }),
-      axios.get(`/api/ontologies/${props.oldVersion.id}/files`, {
-        params: { path: change.file_path }
-      })
-    ])
-    
-    selectedFileDiff.value = {
-      path: change.file_path,
-      status: change.status,
-      oldContent: oldContentRes.data.content || oldContentRes.data || '',
-      newContent: newContentRes.data.content || newContentRes.data || ''
-    }
-    
-    console.log('File diff loaded:', selectedFileDiff.value)
-  } catch (error) {
-    console.error('Error fetching file diff:', error)
-    showMessage('获取文件内容失败', 'error')
+const viewFileDiff = (change) => {
+  // Directly use the content returned from the compare API
+  selectedFileDiff.value = {
+    path: change.file_path,
+    status: change.status,
+    oldContent: change.base_content || '',
+    newContent: change.target_content || ''
   }
 }
 

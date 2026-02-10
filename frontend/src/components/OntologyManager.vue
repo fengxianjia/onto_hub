@@ -95,7 +95,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import axios from 'axios'
 import { Button, Card, Badge, Empty, Loading, Pagination } from './index.js'
-import { showMessage, message } from '../utils/message.js'
+import { formatDate } from '../utils/format.js'
 
 const emit = defineEmits(['open-upload', 'view', 'history', 'subscription', 'delete'])
 
@@ -107,11 +107,7 @@ const pagination = reactive({
   total: 0
 })
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z')
-  return date.toLocaleString()
-}
+
 
 const fetchOntologies = async () => {
   loading.value = true

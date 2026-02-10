@@ -32,14 +32,20 @@ class ParsingService:
             if not key or not pattern:
                 continue
             try:
-                match = re.search(pattern, content, re.MULTILINE)
+                # 编译正则表达式，检查语法错误
+                compiled_pattern = re.compile(pattern, re.MULTILINE)
+                match = compiled_pattern.search(content)
                 if match:
                     if match.groups():
+                        # 获取第一个分组
                         attributes[key] = match.group(1).strip()
                     else:
+                        # 全量匹配
                         attributes[key] = match.group(0).strip()
-            except re.error:
-                logger.warning(f"Invalid regex pattern: {pattern}")
+            except re.error as e:
+                logger.warning(f"模板正则语法错误: '{pattern}' for key '{key}'. Error: {e}")
+            except Exception as e:
+                logger.error(f"提取属性 '{key}' 时发生未知错误: {e}")
         
         # 2. Table Row Extraction
         strategies = attr_rules.get("strategies", [])
