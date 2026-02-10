@@ -23,73 +23,48 @@
     *   实时记录推送日志（成功/失败状态、响应码）。
     *   提供重试机制和交付详情查看。
 
-### 3. 安全与完整性 (Security & Integrity)
-*   **删除保护**：
-    *   **Active 保护**：正在启用的版本（Active）禁止删除。
-    *   **使用中保护**：被下游系统通过 Webhook 成功接收且未更新的版本，禁止删除，防止破坏依赖。
-*   **完整性校验**：上传时自动检查 ZIP 包结构安全性（防止 Zip Slip）。
+### 3. 安全与纵深防御 (Security & Deep Defense)
+*   **ZIP 攻击防护**：
+    *   **Zip Slip 防御**：重构路径校验算法，严禁非法路径逃逸。
+    *   **ZIP 炸弹防御**：实时解压限额统计，严格限制总容量 (500MB) 与文件数 (1000个)。
+*   **正则 ReDoS 加固**：解析引擎内置超时与异常处理，防止恶意构造的正则导致 CPU 耗尽。
+*   **删除保护**：Active 版本及下游耦合版本（通过 Webhook 追踪）严禁物理删除。
 
-### 4. 本体管理与重析 (Management & Re-parsing)
-*   **元数据动态更新**：支持随时修改本体的显示名称、描述以及默认解析模板（影响未来版本）。
-*   **按需重新解析**：
-    *   **版本隔离**：重析操作仅针对当前选定版本，不影响历史快照。
-    *   **模板覆盖**：支持在重析时指定临时模板，用于算法对比或修复解析错误。
+### 4. 插件式解析引擎 (Plugin-based Parsing)
+*   **解耦架构**：核心引擎与具体格式解析解耦，支持热插拔。
+*   **多格式支持**：默认支持 Markdown (含 Frontmatter/表格)，并预留了 OWL、JSON 接入口。
+*   **自动发现**：基于 `pkgutil` 实现插件自动扫描与注册机制。
+
 ---
 ### 5. 可视化与探索 (Visualization)
-*   **多维视图**：提供文件树、知识图谱、实体列表、关系列表等多个维度的本体探索体验。
-*   **响应式对话框**：全局采用适配大屏的响应式布局，支持跨设备无缝缩放。
-*   **富文本渲染**：集成 `markdown-it`，提供友好的文档阅读体验。
+*   **多维视图**：提供文件树、知识图谱及本地时间显示的实体/关系列表。
+*   **组件化重构**：前端完全基于 Vue 组件化架构，逻辑清晰，性能优异。
 
 ---
 
 ## 技术栈 (Tech Stack)
 
-*   **后端 (Backend)**: 
-    *   Python 3.10+
-    *   **FastAPI**: 高性能异步 Web 框架
-    *   **SQLAlchemy**: ORM 数据库管理
-    *   **SQLite**: 轻量级元数据存储
-*   **前端 (Frontend)**: 
-    *   **Vue 3**: 渐进式 JavaScript 框架
-    *   **Vite**:并通过极速构建工具
-    *   **Element Plus**: 企业级 UI 组件库
-    *   **Axios**: HTTP 客户端
+*   **后端 (Backend)**: Python 3.10+, **FastAPI**, **SQLAlchemy**, **Pytest** (集成测试)
+*   **前端 (Frontend)**: **Vue 3**, **Vite**, **Element Plus**, **LocalTimeZone-aware**
 
 ---
 
 ## 快速开始 (Quick Start)
 
 ### 1. 环境准备
-确保您的环境已安装：
-*   Python 3.10+
-*   Node.js 18+
-*   Git
+确保您的环境已安装：Python 3.10+, Node.js 18+, Git
 
-### 2. 后端启动
+### 2. 启动与测试
 ```bash
-cd onto_manage
-
-# 1. 安装依赖
-pip install -r backend/requirements.txt
-
-# 2. 启动服务 (自动初始化数据库)
-# 服务将运行在 http://127.0.0.1:8003
+# 后端启动
 python run.py
-```
 
-### 3. 前端启动
-```bash
-cd onto_manage/frontend
+# 运行全量安全与集成测试
+cd backend
+./test.ps1
 
-# 1. 安装依赖
-npm install
-
-# 2. 开发模式启动 (热重载)
-npm run dev
-
-# 3. 生产环境构建
-# 构建产物将生成在 frontend/dist，后端会自动托管
-npm run build
+# 前端开发模式
+cd frontend && npm install && npm run dev
 ```
 
 ---
@@ -97,24 +72,22 @@ npm run build
 ## 目录结构 (Project Structure)
 
 ```text
-onto_manage/
+onto_hub/
 ├── backend/
 │   ├── app/
-│   │   ├── services/       # 业务逻辑层 (OntologyService, WebhookService)
-│   │   ├── repositories/   # 数据访问层 (CRUD)
-│   │   ├── routers/        # API 路由定义
-│   │   ├── models.py       # SQLAlchemy 数据模型
-│   │   └── schemas.py      # Pydantic 数据验证模型
-│   ├── data/               # SQLite 数据库与文件存储
-│   └── requirements.txt
+│   │   ├── services/
+│   │   │   ├── parsers/    # [NEW] 插件解析器目录 (Markdown, Base...)
+│   │   │   └── ...
+│   │   ├── repositories/   # 数据访问层
+│   │   ├── routers/        # API 路由
+│   │   └── models.py       # 数据模型
+│   ├── tests/              # [UPDATED] 全量集成测试 (Security, Parsing)
+│   └── run.py
 ├── frontend/
 │   ├── src/
-│   │   ├── components/     # Vue 组件
-│   │   ├── App.vue         # 主应用入口
+│   │   ├── components/     # [REFACTORED] 已拆分的原子化组件
+│   │   ├── utils/          # [NEW] 格式化工具 (format.js)
 │   │   └── ...
-│   └── vite.config.js      # 前端构建配置
-├── docs/                   # 项目文档
-├── run.py                  # 项目启动脚本 (含 uvicorn 配置)
 └── README.md
 ```
 

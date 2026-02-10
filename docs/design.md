@@ -139,6 +139,13 @@ graph TB
 
 ---
 
+## 5. 项目工程化 (DevOps)
+*   **集成测试驱动**: 建立了 `tests/integration` 套件。
+*   **Mock 机制**: 在测试环境下使用独立存储路径，确保测试数据不污染生产环境。
+*   **时间转换逻辑**: 前端统一走 `utils/format.js` 进行 UTC 隔离。
+
+---
+
 ## 6. 管理与重析设计 (Management & Re-parsing)
 
 ### 6.1 系列管理 (Series Management)

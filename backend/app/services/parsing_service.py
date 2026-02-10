@@ -3,16 +3,21 @@ import yaml
 import os
 import json
 import logging
-from typing import List, Dict, Optional
+import importlib
+import pkgutil
+from typing import List, Dict, Optional, Type
 from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..models import OntologyPackage, OntologyFile, ParsingTemplate, OntologyEntity, OntologyRelation
+from .parsers.base import BaseParser
 
 logger = logging.getLogger(__name__)
 
 class ParsingService:
     def __init__(self, db: Session):
         self.db = db
+        self._parsers: Dict[str, BaseParser] = {}
+        self._register_parsers()
 
     @property
     def storage_dir(self) -> str:
@@ -20,106 +25,38 @@ class ParsingService:
         from ..config import settings
         return settings.STORAGE_DIR
 
-    def _extract_attributes(self, content: str, rules: dict) -> dict:
-        attributes = {}
-        attr_rules = rules.get("attribute", {})
-        
-        # 1. Regex Extraction
-        regex_patterns = attr_rules.get("regex_patterns", [])
-        for rule in regex_patterns:
-            key = rule.get("key")
-            pattern = rule.get("pattern")
-            if not key or not pattern:
-                continue
-            try:
-                # 编译正则表达式，检查语法错误
-                compiled_pattern = re.compile(pattern, re.MULTILINE)
-                match = compiled_pattern.search(content)
-                if match:
-                    if match.groups():
-                        # 获取第一个分组
-                        attributes[key] = match.group(1).strip()
-                    else:
-                        # 全量匹配
-                        attributes[key] = match.group(0).strip()
-            except re.error as e:
-                logger.warning(f"模板正则语法错误: '{pattern}' for key '{key}'. Error: {e}")
-            except Exception as e:
-                logger.error(f"提取属性 '{key}' 时发生未知错误: {e}")
-        
-        # 2. Table Row Extraction
-        strategies = attr_rules.get("strategies", [])
-        for strategy in strategies:
-            if strategy.get("type") == "table_row":
-                target_key = strategy.get("target_key", "properties")
-                header_mapping = strategy.get("header_mapping", {})
-                
-                rows = self._parse_markdown_table(content, header_mapping)
-                if rows:
-                    attributes[target_key] = rows
-                    
-        return attributes
-
-    def _parse_markdown_table(self, content: str, header_mapping: dict) -> List[dict]:
+    def _register_parsers(self):
         """
-        Parses the first table in the content that matches the header mapping.
+        自动发现并注册 app/services/parsers 目录下的解析器插件
         """
-        lines = content.split('\n')
-        table_start_index = -1
-        
-        # Find table header
-        # Header must be followed by a separator line like |---|---|
-        for i, line in enumerate(lines):
-            line = line.strip()
-            if not line.startswith('|'): continue
+        try:
+            import app.services.parsers as pars_pkg
+            pkg_path = os.path.dirname(pars_pkg.__file__)
             
-            # Potential header
-            if i + 1 < len(lines):
-                next_line = lines[i+1].strip()
-                # Check for separator line
-                if next_line.startswith('|') and '---' in next_line:
-                    # Found a table structure. Now check if headers match our mapping.
-                    headers = [h.strip() for h in line.strip('|').split('|')]
-                    
-                    # Check if ANY of the mapped headers exist in this table
-                    # Using set intersection to see if this table is relevant
-                    mapped_headers_present = [h for h in headers if h in header_mapping]
-                    
-                    if mapped_headers_present:
-                        table_start_index = i
-                        break
-        
-        if table_start_index == -1:
-            return []
-            
-        # Parse Headers
-        header_line = lines[table_start_index].strip()
-        raw_headers = [h.strip() for h in header_line.strip('|').split('|')]
-        
-        # Parse Rows
-        rows = []
-        for i in range(table_start_index + 2, len(lines)):
-            line = lines[i].strip()
-            if not line.startswith('|'):
-                break # End of table
-            
-            cells = [c.strip() for c in line.strip('|').split('|')]
-            
-            # Handle row normalization (sometimes cells might be fewer than headers)
-            row_data = {}
-            for col_idx, header in enumerate(raw_headers):
-                if header in header_mapping:
-                    key = header_mapping[header]
-                    val = cells[col_idx] if col_idx < len(cells) else ""
-                    row_data[key] = val
-            
-            if row_data:
-                rows.append(row_data)
+            for _, name, _ in pkgutil.iter_modules([pkg_path]):
+                if name == 'base': continue
                 
-        return rows
+                try:
+                    module_name = f"app.services.parsers.{name}"
+                    module = importlib.import_module(module_name)
+                    
+                    for attr_name in dir(module):
+                        attr = getattr(module, attr_name)
+                        if (isinstance(attr, type) and 
+                            issubclass(attr, BaseParser) and 
+                            attr is not BaseParser):
+                            
+                            parser_instance = attr()
+                            for ext in parser_instance.supported_extensions:
+                                self._parsers[ext.lower()] = parser_instance
+                                logger.info(f"Registered parser {attr.__name__} for extension {ext}")
+                except Exception as e:
+                    logger.error(f"Failed to load parser plugin {name}: {e}")
+        except Exception as e:
+            logger.error(f"ParsingService initialization failed: {e}")
 
     def parse_package(self, package_id: str, template_id: str):
-        logger.info(f"Starting parsing for package {package_id} with template {template_id}")
+        logger.info(f"Starting plugin-based parsing for package {package_id} with template {template_id}")
         
         package = self.db.query(OntologyPackage).filter(OntologyPackage.id == package_id).first()
         template = self.db.query(ParsingTemplate).filter(ParsingTemplate.id == template_id).first()
@@ -137,72 +74,71 @@ class ParsingService:
             return
 
         entity_rules = rules.get("entity", {})
-        
         name_to_id_map = {} 
         base_dir = os.path.join(self.storage_dir, package_id)
-
         files = self.db.query(OntologyFile).filter(OntologyFile.package_id == package_id).all()
         
         entities_to_add = []
         relations_to_add = []
-        parsed_files = [] 
-        
+        parsed_results = [] 
+
         for file_record in files:
             full_path = os.path.join(base_dir, file_record.file_path)
             if not os.path.exists(full_path):
                 logger.warning(f"File not found: {full_path}")
                 continue
-                
-            if not full_path.endswith(".md"):
+            
+            ext = os.path.splitext(file_record.file_path)[1].lower()
+            parser = self._parsers.get(ext)
+            
+            if not parser:
+                # logger.debug(f"No parser found for extension {ext}, skipping {file_record.file_path}")
                 continue
                 
-            with open(full_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
                 
-            frontmatter, body = self._parse_frontmatter(content)
-            
-            # Extract Attributes
-            regex_attributes = self._extract_attributes(body, rules)
-            merged_metadata = {**frontmatter, **regex_attributes}
-            
-            entity_name = self._extract_entity_name(file_record, frontmatter, entity_rules)
-            entity_category = self._extract_category(file_record, frontmatter, entity_rules)
-            
-            entity = OntologyEntity(
-                package_id=package_id,
-                name=entity_name,
-                category=entity_category,
-                metadata_json=json.dumps(merged_metadata, ensure_ascii=False),
-                file_path=file_record.file_path
-            )
-            entity.id = models.generate_uuid()
-            
-            entities_to_add.append(entity)
-            name_to_id_map[entity_name] = entity.id
-            
-            parsed_files.append({
-                "entity_id": entity.id,
-                "body": body,
-                "frontmatter": frontmatter
-            })
+                # 调用插件解析
+                # 调整后的插件接口返回: (metadata, links, body)
+                metadata, links, body = parser.parse(file_record, content, rules)
+                
+                # 核心 Service 统一提取 Entity 基础信息 (Name, Category)
+                # 这样插件可以专注于“抠内容”，而命名规则保持在核心掌控下
+                entity_name = self._extract_entity_name(file_record, metadata, entity_rules)
+                entity_category = self._extract_category(file_record, metadata, entity_rules)
+                
+                entity = OntologyEntity(
+                    package_id=package_id,
+                    name=entity_name,
+                    category=entity_category,
+                    metadata_json=json.dumps(metadata, ensure_ascii=False),
+                    file_path=file_record.file_path
+                )
+                entity.id = models.generate_uuid()
+                
+                entities_to_add.append(entity)
+                name_to_id_map[entity_name] = entity.id
+                
+                parsed_results.append({
+                    "entity_id": entity.id,
+                    "links": links
+                })
+            except Exception as e:
+                logger.error(f"Error parsing file {file_record.file_path} with {parser.__class__.__name__}: {e}")
 
+        # 批量写入实体
         self.db.add_all(entities_to_add)
         self.db.flush()
         
-        wiki_link_pattern = re.compile(r'\[\[(.*?)(?:\|.*?)?\]\]')
-        
-        for pfile in parsed_files:
-            source_id = pfile["entity_id"]
-            body = pfile["body"]
-            
-            matches = wiki_link_pattern.findall(body)
-            for target_name in matches:
+        # 统一处理关系构建
+        for result in parsed_results:
+            source_id = result["entity_id"]
+            for target_name in result["links"]:
                 target_name = target_name.strip()
                 if target_name in name_to_id_map:
                     target_id = name_to_id_map[target_name]
-                    
-                    if source_id == target_id:
-                        continue
+                    if source_id == target_id: continue
                         
                     rel = OntologyRelation(
                         package_id=package_id,
@@ -227,38 +163,19 @@ class ParsingService:
         self.db.query(OntologyEntity).filter(OntologyEntity.package_id == package_id).delete()
         self.db.commit()
 
-    def _parse_frontmatter(self, content: str):
-        """
-        Simple YAML frontmatter parser.
-        """
-        if content.startswith("---\n"):
-            parts = content.split("---", 2)
-            if len(parts) >= 3:
-                yaml_text = parts[1]
-                body = parts[2]
-                try:
-                    metadata = yaml.safe_load(yaml_text)
-                    if isinstance(metadata, dict):
-                        return metadata, body
-                except yaml.YAMLError:
-                    pass
-        return {}, content
-
-    def _extract_entity_name(self, file_record: OntologyFile, frontmatter: dict, rules: dict) -> str:
+    def _extract_entity_name(self, file_record: OntologyFile, metadata: dict, rules: dict) -> str:
         strategy = rules.get("name_source", "filename_no_ext")
-        if strategy == "frontmatter:title":
-            return frontmatter.get("title", os.path.splitext(os.path.basename(file_record.file_path))[0])
+        if strategy == "frontmatter:title" or strategy == "metadata:title":
+            return metadata.get("title", os.path.splitext(os.path.basename(file_record.file_path))[0])
         else:
-            # Default: filename without extension
             base = os.path.basename(file_record.file_path)
             return os.path.splitext(base)[0]
 
-    def _extract_category(self, file_record: OntologyFile, frontmatter: dict, rules: dict) -> str:
+    def _extract_category(self, file_record: OntologyFile, metadata: dict, rules: dict) -> str:
         strategy = rules.get("category_source", "directory")
-        if strategy == "frontmatter:type":
-            return frontmatter.get("type", "Uncategorized")
+        if strategy == "frontmatter:type" or strategy == "metadata:type":
+            return metadata.get("type", "Uncategorized")
         elif strategy == "directory":
-            # Use parent directory name
             dirname = os.path.dirname(file_record.file_path)
             if not dirname or dirname == ".":
                 return "Root"

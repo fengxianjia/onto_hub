@@ -82,17 +82,19 @@
 }
 ```
 
-## 5. 业务流程 (Workflow)
+### 2.4 插件适配器 (Parser Adapter)
+新的解析流允许不同后缀名分流到不同解析器。例如：
+*   `.md(MarkdownParser)` -> 提取 Frontmatter + Regex + WikiLinks。
+*   `.json(JsonParser)` -> 提取键值对元数据（规划中）。
 
-1.  **模板管理**: 管理员预先创建/配置 `ParsingTemplate`。
-2.  **上传/解析**:
-    *   用户上传本体 (或添加版本) 时，**必须**选择一个 `ParsingTemplate` (或使用 Default)。
-    *   后端保存文件后，触发异步任务 `ParseOntologyTask`。
-    *   任务遍历所有 MD 文件，根据规则提取 Entity 和 Relation，批量写入数据库。
-3.  **可视化**:
-    *   前端调用 `GET /api/ontologies/{id}/graph`。
-    *   后端返回 Node/Link 数据格式 (适配 D3.js / ECharts / AntV G6)。
-    *   前端渲染 Force Directed Graph。
+## 3. 数据模型 (Data Model)
+(保持原实体与关系模型不变，但 metadata_json 指向了插件提取的全量数据)
+
+## 5. 插件化解析流程 (Plugin Workflow)
+1.  **扫描文件**: `ParsingService` 遍历包内文件。
+2.  **动态分发**: 根据后缀匹配注册表中的 `parser` 实例。
+3.  **结果归集**: 插件返回 `(metadata, links, body)`。
+4.  **关系自动构建**: 核心 Service 统一处理 `links` 到数据库 `OntologyRelation` 的映射。
 
 ## 6. API 设计
 
