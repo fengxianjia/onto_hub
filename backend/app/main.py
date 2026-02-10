@@ -97,7 +97,14 @@ def get_ontology_service(
     webhook_repo = WebhookRepository(db)
     return OntologyService(onto_repo, webhook_repo, webhook_service)
 
-@app.post("/api/ontologies", response_model=schemas.OntologyPackageResponse, status_code=201)
+@app.post(
+    "/api/ontologies", 
+    response_model=schemas.OntologyPackageResponse, 
+    status_code=201,
+    summary="创建/上传本体新版本",
+    description="上传一个 ZIP 压缩包来创建本体的新版本。系统会自动触发异步解析流程。",
+    tags=["Ontologies"]
+)
 async def create_ontology_series(
     background_tasks: BackgroundTasks,
     code: str = Form(..., description="本体唯一编码 (Series ID)"),
@@ -131,7 +138,14 @@ async def create_ontology_series(
         
     return package_resp
 
-@app.post("/api/ontologies/{code}/versions", response_model=schemas.OntologyPackageResponse, status_code=201)
+@app.post(
+    "/api/ontologies/{code}/versions", 
+    response_model=schemas.OntologyPackageResponse, 
+    status_code=201,
+    summary="添加本体新版本",
+    description="在现有的本体系列下上传一个新的版本文件。支持自定义版本号。",
+    tags=["Ontologies"]
+)
 async def add_ontology_version(
     code: str,
     background_tasks: BackgroundTasks,
@@ -164,7 +178,13 @@ async def add_ontology_version(
         
     return package_resp
 
-@app.patch("/api/ontologies/{code}", response_model=schemas.OntologyPackageResponse)
+@app.patch(
+    "/api/ontologies/{code}", 
+    response_model=schemas.OntologyPackageResponse,
+    summary="更新本体元数据",
+    description="修改本体系列的名称、描述或默认模板信息。返回该系列当前激活或最新的版本信息。",
+    tags=["Ontologies"]
+)
 async def update_ontology_metadata(
     code: str,
     series_in: schemas.OntologySeriesUpdate,
@@ -187,7 +207,13 @@ async def update_ontology_metadata(
          
     return package
 
-@app.post("/api/ontologies/packages/{package_id}/reparse")
+@app.post(
+    "/api/ontologies/packages/{package_id}/reparse", 
+    response_model=schemas.OntologyPackageResponse,
+    summary="重新解析本体 (异步)",
+    description="使用新的模板或解析规则再次处理现有的 ZIP 包。会清除旧的解析结果并重新入库。",
+    tags=["Ontologies"]
+)
 async def reparse_ontology(
     package_id: str,
     background_tasks: BackgroundTasks,
@@ -223,15 +249,28 @@ def _broadcast_activation(package, service, webhook_service, background_tasks):
         db=service.onto_repo.db
     )
 
-@app.post("/api/webhooks", response_model=schemas.WebhookResponse, status_code=201)
-def create_webhook(
+@app.post(
+    "/api/webhooks", 
+    response_model=schemas.WebhookResponse, 
+    status_code=201,
+    summary="注册新 Webhook",
+    description="创建一个外部通知回调。建议配置 secret_token 以启用 HMAC-SHA256 签名校验。",
+    tags=["Webhooks"]
+)
+async def create_webhook(
     webhook: schemas.WebhookCreate,
     service: WebhookService = Depends(get_webhook_service)
 ):
     result = service.create_webhook(webhook)
     return handle_result(result)
 
-@app.get("/api/webhooks", response_model=schemas.PaginatedWebhookResponse)
+@app.get(
+    "/api/webhooks", 
+    response_model=schemas.PaginatedWebhookResponse,
+    summary="获取 Webhook 列表",
+    description="查看所有配置的外部通知回调点。",
+    tags=["Webhooks"]
+)
 def list_webhooks(
     skip: int = 0, 
     limit: int = 100,
@@ -243,7 +282,13 @@ def list_webhooks(
 from .routers import templates
 app.include_router(templates.router)
 
-@app.delete("/api/webhooks/{id}", status_code=204)
+@app.delete(
+    "/api/webhooks/{id}", 
+    status_code=204,
+    summary="删除 Webhook",
+    description="注销指定的 Webhook 订阅，停止向其发送通知。",
+    tags=["Webhooks"]
+)
 def delete_webhook(
     id: str,
     service: WebhookService = Depends(get_webhook_service)
@@ -251,7 +296,13 @@ def delete_webhook(
     service.delete_webhook(id)
     return None
 
-@app.put("/api/webhooks/{id}", response_model=schemas.WebhookResponse)
+@app.put(
+    "/api/webhooks/{id}", 
+    response_model=schemas.WebhookResponse,
+    summary="更新 Webhook 配置",
+    description="修改 Webhook 的目标地址、事件类型、过滤条件或安全令牌。",
+    tags=["Webhooks"]
+)
 def update_webhook(
     id: str,
     webhook: schemas.WebhookCreate,
@@ -260,7 +311,13 @@ def update_webhook(
     result = service.update_webhook(id, webhook)
     return handle_result(result)
 
-@app.get("/api/webhooks/{id}/logs", response_model=schemas.PaginatedWebhookDeliveryResponse)
+@app.get(
+    "/api/webhooks/{id}/logs", 
+    response_model=schemas.PaginatedWebhookDeliveryResponse,
+    summary="获取 Webhook 交付日志",
+    description="获取指定 Webhook 的历史推送记录，支持按本体名称或交付状态过滤。",
+    tags=["Webhooks"]
+)
 def get_webhook_logs(
     id: str,
     ontology_name: str = Query(None, description="按本体编码/名称过滤"),
@@ -271,7 +328,12 @@ def get_webhook_logs(
 ):
     return service.get_logs_by_webhook(id, ontology_name, status, skip, limit)
 
-@app.post("/api/webhooks/{id}/ping")
+@app.post(
+    "/api/webhooks/{id}/ping",
+    summary="连通性测试 (Ping)",
+    description="向指定的 Webhook 目标 URL 发送一个 Ping 测试包，验证其是否可达及响应状态。",
+    tags=["Webhooks"]
+)
 async def ping_webhook(
     id: str,
     service: WebhookService = Depends(get_webhook_service)
@@ -279,7 +341,13 @@ async def ping_webhook(
     result = await service.ping_webhook(id)
     return handle_result(result)
 
-@app.get("/api/ontologies", response_model=schemas.PaginatedOntologyResponse)
+@app.get(
+    "/api/ontologies", 
+    response_model=schemas.PaginatedOntologyResponse,
+    summary="获取本体系列列表",
+    description="分页获取所有已注册的本体系列（不包含具体的历史版本细节）。",
+    tags=["Ontologies"]
+)
 def get_ontologies(
     skip: int = 0, 
     limit: int = 100, 
@@ -290,7 +358,13 @@ def get_ontologies(
 ):
     return service.list_ontologies(skip, limit, name, code, all_versions=False)
 
-@app.get("/api/ontologies/{code}/versions", response_model=schemas.PaginatedOntologyResponse)
+@app.get(
+    "/api/ontologies/{code}/versions", 
+    response_model=schemas.PaginatedOntologyResponse,
+    summary="列出本体所有版本历史",
+    description="获取特定本体系列下的所有版本记录，按上传时间倒序排列。",
+    tags=["Ontologies"]
+)
 def get_ontology_versions(
     code: str,
     skip: int = 0,
@@ -300,7 +374,12 @@ def get_ontology_versions(
     """获取指定本体的所有历史版本"""
     return service.list_versions(code, skip, limit)
 
-@app.get("/api/ontologies/{code}/versions/{version}/download")
+@app.get(
+    "/api/ontologies/{code}/versions/{version}/download",
+    summary="下载指定版本的原始 ZIP 包",
+    description="获取本体物理存储的原始 ZIP 上传包。支持断点续传与流式下载。",
+    tags=["Ontologies"]
+)
 async def download_ontology_version(
     code: str,
     version: int,
@@ -319,7 +398,12 @@ async def download_ontology_version(
         media_type="application/zip"
     )
 
-@app.post("/api/ontologies/{id}/activate")
+@app.post(
+    "/api/ontologies/{id}/activate",
+    summary="激活本体特定版本",
+    description="将指定的本体包标记为已激活状态，并触发 Webhook 广播推送。",
+    tags=["Ontologies"]
+)
 def activate_ontology(
     id: str,
     background_tasks: BackgroundTasks,
@@ -348,7 +432,12 @@ def activate_ontology(
         
     return {"status": "activated", "version": package.version}
     
-@app.post("/api/ontologies/{id}/push")
+@app.post(
+    "/api/ontologies/{id}/push",
+    summary="手动触发 Webhook 推送",
+    description="将指定的本体包手动推送至特定的 Webhook 节点，不影响当前激活状态。",
+    tags=["Webhooks"]
+)
 async def push_ontology_to_webhook(
     id: str,
     webhook_id: str = Query(..., description="目标 Webhook ID"),
@@ -383,7 +472,13 @@ async def push_ontology_to_webhook(
         "delivery_result": result_data
     }
 
-@app.delete("/api/ontologies/{id}", status_code=204)
+@app.delete(
+    "/api/ontologies/{id}", 
+    status_code=204,
+    summary="删除单个本体版本",
+    description="删除特定的历史版本记录。如果该版本是当前激活版本，系统可能会拒绝操作或要求先激活其他版本。",
+    tags=["Ontologies"]
+)
 def delete_ontology_version(
     id: str,
     service: OntologyService = Depends(get_ontology_service)
@@ -396,7 +491,13 @@ def delete_ontology_version(
     handle_result(result)
     return None
 
-@app.delete("/api/ontologies/by-code/{code}", status_code=204)
+@app.delete(
+    "/api/ontologies/by-code/{code}", 
+    status_code=204,
+    summary="删除整个本体系列",
+    description="危险操作：级联删除该系列下的所有版本记录、解析出的实体关系以及物理存储的文件。",
+    tags=["Ontologies"]
+)
 def delete_ontology_series(
     code: str,
     service: OntologyService = Depends(get_ontology_service)
@@ -408,7 +509,13 @@ def delete_ontology_series(
     handle_result(result)
     return None
 
-@app.get("/api/ontologies/compare", response_model=schemas.OntologyComparisonResponse)
+@app.get(
+    "/api/ontologies/compare", 
+    response_model=schemas.OntologyComparisonResponse,
+    summary="差异化对比两个本体版本",
+    description="对两个指定的本体包进行物理文件级别的对比，返回新增、删除和修改的文件列表及内容 Diff。",
+    tags=["Ontologies"]
+)
 async def compare_ontologies(
     base_id: str = Query(..., description="基准版本ID"),
     target_id: str = Query(..., description="目标版本ID"),
@@ -418,7 +525,12 @@ async def compare_ontologies(
     result = await service.compare_packages(base_id, target_id)
     return handle_result(result)
 
-@app.get("/api/ontologies/by-code/{code}/subscriptions")
+@app.get(
+    "/api/ontologies/by-code/{code}/subscriptions",
+    summary="获取本体订阅详情",
+    description="查询有哪些 Webhook 订阅了该本体系列，并返回它们当前通过回调获取到的版本信息。",
+    tags=["Webhooks"]
+)
 def get_ontology_subscriptions(
     code: str,
     service: WebhookService = Depends(get_webhook_service)
@@ -426,7 +538,13 @@ def get_ontology_subscriptions(
     """获取订阅了指定本体的所有 Webhook 及其使用的版本"""
     return service.get_subscription_status(name=None, code=code)
 
-@app.get("/api/ontologies/{id}", response_model=schemas.OntologyPackageDetailResponse)
+@app.get(
+    "/api/ontologies/{id}", 
+    response_model=schemas.OntologyPackageDetailResponse,
+    summary="获取本体包详细信息",
+    description="通过 ID 获取本体包的详细元数据，包括包内文件列表、状态及关联模板。",
+    tags=["Ontologies"]
+)
 def get_ontology_detail(
     id: str,
     service: OntologyService = Depends(get_ontology_service)
@@ -434,7 +552,12 @@ def get_ontology_detail(
     result = service.get_ontology_detail(id)
     return handle_result(result)
 
-@app.get("/api/ontologies/{id}/deliveries")
+@app.get(
+    "/api/ontologies/{id}/deliveries",
+    summary="查询本体交付历史",
+    description="获取指定本体包发送给各个 Webhook 的详细交付记录及结果。",
+    tags=["Webhooks"]
+)
 def get_ontology_deliveries(
     id: str,
     onto_service: OntologyService = Depends(get_ontology_service),
@@ -447,7 +570,12 @@ def get_ontology_deliveries(
     package = handle_result(pkg_result)
     return webhook_service.get_ontology_delivery_status(id, package.code)
 
-@app.get("/api/ontologies/{id}/files")
+@app.get(
+    "/api/ontologies/{id}/files",
+    summary="读取包内特定文件内容",
+    description="通过本体 ID 和文件路径，实时读取 ZIP 包内某个文件的原文字符串。常用于预览 OWL 或 Markdown 内容。",
+    tags=["Ontologies"]
+)
 def read_ontology_file(
     id: str,
     path: str = Query(..., description="文件相对路径"),
@@ -456,7 +584,13 @@ def read_ontology_file(
     result = service.get_file_content(id, path)
     return {"content": handle_result(result)}
 
-@app.get("/api/ontologies/{id}/graph", response_model=schemas.OntologyGraphResponse)
+@app.get(
+    "/api/ontologies/{id}/graph", 
+    response_model=schemas.OntologyGraphResponse,
+    summary="获取本体关联图谱",
+    description="返回该本体包解析出的所有实体(Nodes)和关系(Links)，用于前端 3D/2D 图谱展示。",
+    tags=["Ontologies"]
+)
 def get_ontology_graph(
     id: str,
     db: Session = Depends(get_db)
@@ -472,7 +606,13 @@ def get_ontology_graph(
         "links": relations
     }
 
-@app.get("/api/ontologies/{id}/entities", response_model=List[schemas.OntologyEntityResponse])
+@app.get(
+    "/api/ontologies/{id}/entities", 
+    response_model=List[schemas.OntologyEntityResponse],
+    summary="分页获取本体实体列表",
+    description="查询特定本体包解析出的所有实体对象（类、实例等），支持分页。",
+    tags=["Ontologies"]
+)
 def get_ontology_entities(
     id: str,
     skip: int = 0,
@@ -484,7 +624,13 @@ def get_ontology_entities(
     """
     return db.query(models.OntologyEntity).filter(models.OntologyEntity.package_id == id).offset(skip).limit(limit).all()
 
-@app.get("/api/ontologies/{id}/relations", response_model=schemas.PaginatedOntologyRelationResponse)
+@app.get(
+    "/api/ontologies/{id}/relations", 
+    response_model=schemas.PaginatedOntologyRelationResponse,
+    summary="分页获取本体关系列表",
+    description="查询特定本体包解析出的所有语义关系（继承、属性关联等），包含源实体与目标实体的简要信息。",
+    tags=["Ontologies"]
+)
 def get_ontology_relations(
     id: str,
     skip: int = Query(0, ge=0),
@@ -503,7 +649,12 @@ DIST_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
 if os.path.exists(DIST_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
     
-    @app.get("/{full_path:path}")
+    @app.get(
+        "/{full_path:path}",
+        summary="静态资源服务 (前端入口)",
+        description="负责交付 Vue 编译后的静态资源文件，并为单页应用（SPA）提供路由保底机制。",
+        tags=["System"]
+    )
     async def serve_frontend(full_path: str):
         if full_path.startswith("api"):
              raise HTTPException(status_code=404, detail="Not Found")

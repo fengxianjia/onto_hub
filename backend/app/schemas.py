@@ -1,44 +1,44 @@
-from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from pydantic import BaseModel, ConfigDict, Field
+from typing import List, Optional, Any
 from datetime import datetime
 
 class OntologyFileBase(BaseModel):
-    file_path: str
-    file_size: int
-    content_preview: Optional[str] = None
+    file_path: str = Field(..., description="文件在包内的相对路径", examples=["src/core.owl"])
+    file_size: int = Field(..., description="文件大小 (Bytes)", examples=[10240])
+    content_preview: Optional[str] = Field(None, description="内容预览 (部分截断)")
 
 class OntologyFileResponse(OntologyFileBase):
-    id: str
-    package_id: str
+    id: str = Field(..., description="文件记录 UUID")
+    package_id: str = Field(..., description="所属本体包 UUID")
 
     model_config = ConfigDict(from_attributes=True)
 
 class OntologyPackageBase(BaseModel):
-    name: str
-    code: Optional[str] = None
-    version: int = 1
-    is_active: bool = False
+    name: str = Field(..., description="显示名称", examples=["企业核心本体"])
+    code: Optional[str] = Field(None, description="本体唯一编码 (Slug)", examples=["eco"])
+    version: int = Field(1, description="版本序列号", examples=[1])
+    is_active: bool = Field(False, description="是否为当前生效的主版本")
 
 class OntologyPackageCreate(OntologyPackageBase):
-    description: Optional[str] = None
-    template_id: Optional[str] = None
+    description: Optional[str] = Field(None, description="版本更新说明")
+    template_id: Optional[str] = Field(None, description="指定的解析模板 ID")
 
 class OntologyPackageResponse(OntologyPackageBase):
-    id: str
-    description: Optional[str] = None
-    upload_time: datetime
-    status: str
-    error_msg: Optional[str] = None
-    file_count: int = 0
-    is_updated: bool = False
+    id: str = Field(..., description="本体包 UUID")
+    description: Optional[str] = Field(None, description="本体详细描述")
+    upload_time: datetime = Field(..., description="上传时间")
+    status: str = Field(..., description="处理状态 (READY/PARSING/ERROR)", examples=["READY"])
+    error_msg: Optional[str] = Field(None, description="解析失败时的错误详细信息")
+    file_count: int = Field(0, description="包内文件总数")
+    is_updated: bool = Field(False, description="相比上一版本是否有内容实质变更")
     
     # Deletion safety flags
-    is_deletable: bool = True
-    deletable_reason: Optional[str] = None
+    is_deletable: bool = Field(True, description="是否允许物理删除")
+    deletable_reason: Optional[str] = Field(None, description="不可删除时的原因说明")
 
-    template_id: Optional[str] = None
-    template_name: Optional[str] = None
-    subscriber_count: Optional[int] = 0
+    template_id: Optional[str] = Field(None, description="绑定的解析模板 ID")
+    template_name: Optional[str] = Field(None, description="模板名称")
+    subscriber_count: Optional[int] = Field(0, description="当前的订阅订阅者数量")
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -58,11 +58,11 @@ class PaginatedOntologyResponse(BaseModel):
     total: int
 
 class WebhookBase(BaseModel):
-    name: Optional[str] = "Webhook"
-    target_url: str
-    event_type: str = "ontology.activated"
-    ontology_filter: Optional[str] = None
-    secret_token: Optional[str] = None # 用于加固
+    name: Optional[str] = Field("Webhook", description="回调配置名称", examples=["钉钉通知"])
+    target_url: str = Field(..., description="接收 POST 请求的目标 URL", examples=["https://api.example.com/webhook"])
+    event_type: str = Field("ontology.activated", description="触发事件类型 (ontology.activated)", examples=["ontology.activated"])
+    ontology_filter: Optional[str] = Field(None, description="过滤特定的本体编码，为空则订阅所有", examples=["eco"])
+    secret_token: Optional[str] = Field(None, description="用于签名验证的共享密钥 (签名算法: HMAC-SHA256)")
 
 class WebhookCreate(WebhookBase):
     pass
@@ -108,10 +108,12 @@ class OntologyComparisonResponse(BaseModel):
     files: List[FileDiff]
 
 class ParsingTemplateBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-    parser_type: str = "markdown"
-    rules: str # JSON string
+    name: str = Field(..., description="模板名称", examples=["标准 Markdown 语义模板"])
+    description: Optional[str] = Field(None, description="模板详细描述")
+    parser_type: str = Field("markdown", description="解析器核心类型 (markdown/owl/custom)", examples=["markdown"])
+    rules: str = Field(..., description="JSON 序列化的解析规则字符串", examples=[
+        '{"entity": {"name_source": "filename_no_ext"}, "relation": {"strategies": ["wikilink"]}}'
+    ])
 
 class ParsingTemplateCreate(ParsingTemplateBase):
     pass
