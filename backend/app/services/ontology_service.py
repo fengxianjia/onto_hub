@@ -123,7 +123,21 @@ class OntologyService:
             
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             with zip_ref.open(member) as source, open(target_path, "wb") as target:
-                shutil.copyfileobj(source, target)
+                # 分块读取，并在写入过程中实时检查总大小
+                # member.file_size 可能被恶意修改，所以必须检查实际解压后写入的大小
+                CHUNK_SIZE = 1024 * 1024 # 1MB
+                while True:
+                    chunk = source.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    
+                    target.write(chunk)
+                    total_size += len(chunk)
+                    
+                    if total_size > MAX_TOTAL_SIZE:
+                        # 清理已解压的文件
+                        logger.error(f"解压后总大小超过限制 ({MAX_TOTAL_SIZE} 字节)，操作中止")
+                        raise ValueError(f"解压后总大小超过限制 (上限 {MAX_TOTAL_SIZE // (1024*1024)}MB)")
 
     async def create_ontology(self, file: UploadFile, code: str, custom_id: str = None, name: str = None, template_id: str = None, is_initial: bool = False) -> ServiceResult[models.OntologyPackage]:
         # 严格分层：校验逻辑下沉
