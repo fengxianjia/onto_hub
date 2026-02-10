@@ -91,7 +91,7 @@ graph TB
     *   `payload`: JSON 字符串，包含 `id`, `name`, `version`, `description`, `upload_time`。
     *   `file`: 原始 ZIP 文件流。
 *   **安全性**: 
-    *   支持 `X-Hub-Signature` (HMAC-SHA256) 签名校验（Todo）。
+    *   **X-Hub-Signature-256**: 已实现基于 HMAC-SHA256 的签名校验。发送请求时，Header 中包含 `X-Hub-Signature-256: sha256=<signature>`，确保下游系统能验证推送源。
 
 ---
 

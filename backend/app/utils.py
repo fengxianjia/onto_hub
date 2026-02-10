@@ -58,14 +58,15 @@ async def send_webhook_request(
     # 1. 计算签名 (HMAC-SHA256)
     headers = {}
     if secret_token:
+        # 统一对 payload 进行 JSON 序列化后再签名，确保一致性
         payload_str = json.dumps(payload, ensure_ascii=False)
         signature = hmac.new(
             secret_token.encode('utf-8'),
             payload_str.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
+        # 遵循 GitHub 规范使用 X-Hub-Signature-256
         headers['X-Hub-Signature-256'] = f"sha256={signature}"
-        logger.info(f"Webhook signature generated for {target_url}")
 
     # 0. URL 清洗
     target_url = target_url.strip()
