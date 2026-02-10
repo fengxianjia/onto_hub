@@ -300,6 +300,25 @@ def get_ontology_versions(
     """获取指定本体的所有历史版本"""
     return service.list_versions(code, skip, limit)
 
+@app.get("/api/ontologies/{code}/versions/{version}/download")
+async def download_ontology_version(
+    code: str,
+    version: int,
+    service: OntologyService = Depends(get_ontology_service)
+):
+    """
+    **下载指定版本的原始本体 ZIP 包**
+    """
+    result = service.get_version_package_path(code, version)
+    file_path = handle_result(result)
+    
+    filename = f"{code}_v{version}.zip"
+    return FileResponse(
+        path=file_path, 
+        filename=filename,
+        media_type="application/zip"
+    )
+
 @app.post("/api/ontologies/{id}/activate")
 def activate_ontology(
     id: str,

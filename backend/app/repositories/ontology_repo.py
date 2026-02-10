@@ -79,6 +79,13 @@ class OntologyRepository:
             models.OntologyPackage.series_code == code
         ).order_by(models.OntologyPackage.version.desc()).first()
 
+    def get_package_by_version(self, code: str, version: int) -> Optional[models.OntologyPackage]:
+        """根据本体编码和版本号获取包"""
+        return self.db.query(models.OntologyPackage).filter(
+            models.OntologyPackage.series_code == code,
+            models.OntologyPackage.version == version
+        ).first()
+
     def get_latest_version(self, code: str) -> int:
         # Use series_code to find the latest version
         latest = self.db.query(models.OntologyPackage).filter(

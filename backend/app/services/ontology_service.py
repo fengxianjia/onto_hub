@@ -581,3 +581,23 @@ class OntologyService:
             target_version=target_pkg.version,
             files=diff_results
         ))
+
+    def get_version_package_path(self, code: str, version: int) -> ServiceResult[str]:
+        """获取指定版本的原始本体 ZIP 包物理路径"""
+        package = self.onto_repo.get_package_by_version(code, version)
+        if not package:
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND,
+                f"Version {version} of ontology {code} not found",
+                business_code=BusinessCode.ONTOLOGY_NOT_FOUND
+            )
+            
+        zip_path = self.get_source_zip_path(package.id)
+        if not os.path.exists(zip_path):
+            return ServiceResult.failure_result(
+                ServiceStatus.NOT_FOUND,
+                "Source ZIP file not found on storage",
+                business_code=BusinessCode.FILE_NOT_FOUND
+            )
+            
+        return ServiceResult.success_result(zip_path)

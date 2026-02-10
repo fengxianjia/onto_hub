@@ -117,6 +117,7 @@
                   删除
                 </Button>
 
+                <Button variant="ghost" size="sm" @click="handleDownload(version)">下载源码包</Button>
                 <Button variant="ghost" size="sm" @click="handleViewDetail(version)">查看详情</Button>
                 <Button v-if="index < versions.length - 1" variant="ghost" size="sm" @click="handleCompare(version, versions[index + 1])">
                   对比上一版本
@@ -386,6 +387,17 @@ const handleViewDetail = (version) => {
 
 const handleCompare = (newVersion, oldVersion) => {
   emit('compare', { newVersion, oldVersion })
+}
+
+const handleDownload = (version) => {
+  const url = `/api/ontologies/${props.ontologyCode}/versions/${version.version}/download`;
+  // 使用原生 a 标签触发下载
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `${props.ontologyCode}_v${version.version}.zip`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 watch(() => props.visible, (newVal) => {
