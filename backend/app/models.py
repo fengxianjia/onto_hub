@@ -105,7 +105,7 @@ class Webhook(Base):
     target_url = Column(String, nullable=False, comment="回调地址")
     event_type = Column(String, default="ontology.activated", comment="订阅事件类型")
     # 新增过滤字段: 如果为空则订阅所有；如果有值则仅订阅名称匹配的本体
-    ontology_filter = Column(String, nullable=True, comment="指定订阅的本体名称")
+    ontology_code = Column(String, nullable=True, comment="指定订阅的本体编码")
     # 安全加固: 签名令牌
     secret_token = Column(String, nullable=True, comment="签名令牌 (用于 HMAC 校验)")
     created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
@@ -124,7 +124,7 @@ class WebhookDelivery(Base):
     webhook_id = Column(String, ForeignKey("webhooks.id"), nullable=False)
     event_type = Column(String, nullable=False)
     # 性能加固: 直接存储本体名称并建立索引，避免昂贵的 JSON 搜索
-    ontology_name = Column(String, index=True, nullable=True, comment="所属本体名称")
+    ontology_code = Column(String, index=True, nullable=True, comment="所属本体编码")
     payload = Column(Text, nullable=True)  # maybe JSON string
     status = Column(String, nullable=False) # SUCCESS, FAILURE
     response_status = Column(Integer, nullable=True) # HTTP Code

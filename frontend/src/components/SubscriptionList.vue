@@ -162,10 +162,10 @@ const logsPagination = reactive({
 })
 
 // 获取订阅列表
-// 使用 /api/ontologies/{code}/subscriptions
+// 使用 /api/webhooks/subscriptions/by-code/{code}
 // 该接口会查询:
-// 1. 全局订阅 (ontology_filter 为空的 webhook)
-// 2. 指定本体的订阅 (ontology_filter 匹配 name 或 code)
+// 1. 全局订阅 (ontology_code 为空的 webhook)
+// 2. 指定本体的订阅 (ontology_code 匹配 code)
 const fetchSubscriptions = async (isRefresh = false) => {
   if (!props.ontologyCode) return
   

@@ -69,13 +69,13 @@ def update_webhook(
 )
 def get_webhook_logs(
     id: str,
-    ontology_name: str = Query(None, description="按本体编码/名称过滤"),
+    ontology_code: str = Query(None, description="按本体编码/名称过滤"),
     status: str = Query(None, description="按状态过滤 (SUCCESS/FAILURE)"),
     skip: int = 0,
     limit: int = 20,
     service: WebhookService = Depends(get_webhook_service)
 ):
-    return service.get_logs_by_webhook(id, ontology_name, status, skip, limit)
+    return service.get_logs_by_webhook(id, ontology_code, status, skip, limit)
 
 @router.post(
     "/{id}/ping",
@@ -127,7 +127,7 @@ def get_ontology_subscriptions(
     code: str,
     service: WebhookService = Depends(get_webhook_service)
 ):
-    return service.get_subscription_status(name=None, code=code)
+    return service.get_subscription_status(code=code)
 
 @router.get(
     "/deliveries/{id}",

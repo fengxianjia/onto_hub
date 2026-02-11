@@ -17,15 +17,15 @@ class TestWebhookAPI:
                 "name": name,
                 "target_url": f"https://api.system-a.com/webhooks/{uid}",
                 "event_type": "ontology.activated",
-                "ontology_filter": f"filter-{uid}"
+                "ontology_code": f"filter-{uid}"
             }
         )
-        
+
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == name
-        assert data["ontology_filter"] == f"filter-{uid}"
-    
+        assert data["ontology_code"] == f"filter-{uid}"
+
     def test_list_webhooks(self, client):
         """List all registered webhooks."""
         uid = int(time.time() * 1000)
@@ -35,11 +35,12 @@ class TestWebhookAPI:
             "/api/webhooks",
             json={
                 "name": name,
-                "target_url": f"http://example.com/{uid}"
+                "target_url": f"http://example.com/{uid}",
+                "ontology_code": "all"
             }
         )
         assert resp.status_code == 201
-        
+
         response = client.get("/api/webhooks")
         assert response.status_code == 200
         data = response.json()
@@ -52,7 +53,7 @@ class TestWebhookAPI:
         # Create
         resp = client.post(
             "/api/webhooks",
-            json={"name": name, "target_url": "http://del.com"}
+            json={"name": name, "target_url": "http://del.com", "ontology_code": "eco"}
         )
         wh_id = resp.json()["id"]
         
@@ -71,22 +72,26 @@ class TestWebhookAPI:
         # Create
         resp = client.post(
             "/api/webhooks",
-            json={"name": name, "target_url": "http://old.com"}
+            json={"name": name, "target_url": "http://old.com", "ontology_code": "eco"}
         )
         wh_id = resp.json()["id"]
         
         # Update using PUT (as defined in main.py)
         up_resp = client.put(
             f"/api/webhooks/{wh_id}",
-            json={"name": new_name, "target_url": "http://new.com"}
+            json={"name": new_name, "target_url": "http://new.com", "ontology_code": "eco"}
         )
         assert up_resp.status_code == 200
         assert up_resp.json()["name"] == new_name
 
     def test_get_subscriptions(self, client):
-        """Test getting ontology subscription status."""
-        # This will use the actual service which might hit DB
-        response = client.get("/api/webhooks/subscriptions/by-code/eco")
+        """Verify we can fetch subscriptions for a series code."""
+        code = f"subs-{int(time.time())}"
+        # Create a package first
+        client.post(f"/api/ontologies?is_initial=true&code={code}&name=TestSubs", 
+                   files={"file": ("test.zip", b"PK...")})
+        
+        response = client.get(f"/api/webhooks/subscriptions/by-code/{code}")
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 

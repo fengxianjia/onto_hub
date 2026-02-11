@@ -11,16 +11,16 @@ class EventDispatcher:
     _subscribers: Dict[str, List[Dict]] = {}
 
     @classmethod
-    def subscribe(cls, event_name: str, callback: Callable, ontology_filter: Optional[str] = None):
+    def subscribe(cls, event_name: str, callback: Callable, ontology_code: Optional[str] = None):
         """Register a subscriber for a specific event."""
         if event_name not in cls._subscribers:
             cls._subscribers[event_name] = []
         
         cls._subscribers[event_name].append({
             "callback": callback,
-            "filter": ontology_filter
+            "filter": ontology_code
         })
-        logger.info(f"Subscribed to event '{event_name}' (filter: {ontology_filter})")
+        logger.info(f"Subscribed to event '{event_name}' (filter: {ontology_code})")
 
     @classmethod
     def dispatch(cls, event_name: str, payload: dict):
@@ -28,13 +28,13 @@ class EventDispatcher:
         if event_name not in cls._subscribers:
             return
 
-        ontology_name = payload.get("name")
+        ontology_code = payload.get("code")
         for sub in cls._subscribers[event_name]:
             callback = sub["callback"]
             wh_filter = sub["filter"]
 
-            # Filter logic: global subscription or name match
-            if not wh_filter or wh_filter == ontology_name:
+            # Filter logic: global subscription or code match
+            if not wh_filter or wh_filter == ontology_code:
                 try:
                     callback(payload)
                 except Exception as e:

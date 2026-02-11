@@ -11,7 +11,7 @@ from . import models, database
 
 logger = logging.getLogger(__name__)
 
-async def _save_delivery_log(webhook_id, event_type, ontology_name, payload, status, response_status, error_message, db: Session = None):
+async def _save_delivery_log(webhook_id, event_type, ontology_code, payload, status, response_status, error_message, db: Session = None):
     should_close = False
     if db is None:
         db = database.SessionLocal()
@@ -21,7 +21,7 @@ async def _save_delivery_log(webhook_id, event_type, ontology_name, payload, sta
         delivery = models.WebhookDelivery(
             webhook_id=webhook_id,
             event_type=event_type,
-            ontology_name=ontology_name,
+            ontology_code=ontology_code,
             payload=json.dumps(payload, ensure_ascii=False),
             status=status,
             response_status=response_status,
@@ -43,7 +43,7 @@ async def send_webhook_request(
     file_path: str = None, 
     save_log: bool = True,
     secret_token: str = None,
-    ontology_name: str = None,
+    ontology_code: str = None,
     db: Session = None
 ):
     """
@@ -75,7 +75,7 @@ async def send_webhook_request(
         logger.error(error_message)
         # 记录失败日志并返回标准错误结构
         if save_log:
-            await _save_delivery_log(webhook_id, event_type, ontology_name, payload, "FAILURE", None, error_message, db=db)
+            await _save_delivery_log(webhook_id, event_type, ontology_code, payload, "FAILURE", None, error_message, db=db)
         return {
             "status": "FAILURE",
             "response_status": None,
@@ -115,7 +115,7 @@ async def send_webhook_request(
             await _save_delivery_log(
                 webhook_id=webhook_id,
                 event_type=event_type,
-                ontology_name=ontology_name,
+                ontology_code=ontology_code,
                 payload=payload,
                 status=status,
                 response_status=response_status,

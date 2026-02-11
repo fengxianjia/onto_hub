@@ -56,7 +56,7 @@
                 <Badge variant="accent" size="sm">{{ row.event_type }}</Badge>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <Badge v-if="row.ontology_filter" variant="info" outline size="sm">{{ row.ontology_filter }}</Badge>
+                <Badge v-if="row.ontology_code" variant="info" outline size="sm">{{ row.ontology_code }}</Badge>
                 <Badge v-else variant="default" size="sm">全局 (All)</Badge>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
@@ -152,7 +152,7 @@
           
           <div v-if="!isManualCode">
             <Select
-              v-model="form.ontology_filter"
+              v-model="form.ontology_code"
               :options="ontologyFilterOptions"
               class="w-full"
               placeholder="🔍 搜索并选择已有本体... (留空则订阅所有)"
@@ -161,7 +161,7 @@
           </div>
           <div v-else class="animate-fadeIn">
             <Input 
-              v-model="form.ontology_filter" 
+              v-model="form.ontology_code" 
               placeholder="请输入本体编码 (例如: ontology-core)" 
               class="font-mono"
             />
@@ -242,7 +242,7 @@ const form = reactive({
   name: '',
   target_url: '',
   event_type: 'ontology.activated',
-  ontology_filter: '',
+  ontology_code: '',
   secret_token: ''
 })
 
@@ -261,8 +261,8 @@ const ontologyFilterOptions = computed(() => {
   ]
   
   // 如果当前输入的值不在选项中，且不为空，则作为一个临时可选项显示
-  if (form.ontology_filter && !options.find(o => o.value === form.ontology_filter)) {
-    options.push({ label: `手动输入: ${form.ontology_filter}`, value: form.ontology_filter })
+  if (form.ontology_code && !options.find(o => o.value === form.ontology_code)) {
+    options.push({ label: `手动输入: ${form.ontology_code}`, value: form.ontology_code })
   }
   
   return options
@@ -322,7 +322,7 @@ const handleAdd = () => {
   form.name = ''
   form.target_url = ''
   form.event_type = 'ontology.activated'
-  form.ontology_filter = ''
+  form.ontology_code = ''
   form.secret_token = ''
   isManualCode.value = false
   dialogVisible.value = true
@@ -335,11 +335,11 @@ const handleEdit = (row) => {
   form.name = row.name || 'Webhook'
   form.target_url = row.target_url
   form.event_type = row.event_type
-  form.ontology_filter = row.ontology_filter || ''
+  form.ontology_code = row.ontology_code || ''
   
   // 如果当前过滤值不在已知列表中，自动切为手动模式
-  const isExisting = ontologyFilterOptions.value.some(o => o.value === row.ontology_filter)
-  isManualCode.value = row.ontology_filter && !isExisting ? true : false
+  const isExisting = ontologyFilterOptions.value.some(o => o.value === row.ontology_code)
+  isManualCode.value = row.ontology_code && !isExisting ? true : false
   
   form.secret_token = row.secret_token || ''
   dialogVisible.value = true
@@ -381,7 +381,7 @@ const fetchLogs = async (filters = {}) => {
   logsLoading.value = true
   try {
     const params = {}
-    if (filters.ontology) params.ontology_name = filters.ontology
+    if (filters.ontology) params.ontology_code = filters.ontology
     if (filters.status) params.status = filters.status
     
     params.skip = (logsPagination.currentPage - 1) * logsPagination.pageSize

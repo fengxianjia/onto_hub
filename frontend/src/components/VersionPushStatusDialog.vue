@@ -183,8 +183,8 @@ const fetchPushStatus = async (isInitial = false) => {
     if (isInitial) {
       loading.value = true
     }
-    // 使用后端已有的 API: /api/ontologies/{id}/deliveries
-    const res = await axios.get(`/api/ontologies/${props.packageId}/deliveries`)
+    // 使用后端已有的 API: /api/webhooks/deliveries/{id}
+    const res = await axios.get(`/api/webhooks/deliveries/${props.packageId}`)
     pushStatus.value = res.data
   } catch (e) {
     console.error('获取推送状态失败:', e)

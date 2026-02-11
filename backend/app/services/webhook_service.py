@@ -52,17 +52,20 @@ class WebhookService:
             )
         return ServiceResult.success_result(webhook)
 
-    def get_logs_by_webhook(self, webhook_id: str, ontology_name: str = None, status: str = None, skip: int = 0, limit: int = 20) -> schemas.PaginatedWebhookDeliveryResponse:
-        deliveries, total = self.repo.get_logs_by_webhook(webhook_id, ontology_name, status, skip, limit)
+    def get_logs_by_webhook(self, webhook_id: str, ontology_code: str = None, status: str = None, skip: int = 0, limit: int = 20) -> schemas.PaginatedWebhookDeliveryResponse:
+        deliveries, total = self.repo.get_logs_by_webhook(webhook_id, ontology_code, status, skip, limit)
         results = []
         for delivery, wh_name in deliveries:
             d_dict = {c.name: getattr(delivery, c.name) for c in delivery.__table__.columns}
             d_dict["webhook_name"] = wh_name
+            # 为 UI 增加本体名称注入逻辑
+            if delivery.ontology_code:
+                d_dict["ontology_name"] = self.repo.get_name_by_code(delivery.ontology_code)
             results.append(d_dict)
         return {"items": results, "total": total}
 
-    def get_logs_by_ontology(self, ontology_name: str, skip: int = 0, limit: int = 50):
-        deliveries = self.repo.get_logs_by_ontology(ontology_name, skip, limit)
+    def get_logs_by_ontology(self, ontology_code: str, skip: int = 0, limit: int = 50):
+        deliveries = self.repo.get_logs_by_ontology(ontology_code, skip, limit)
         results = []
         for delivery, wh_name in deliveries:
             d_dict = {c.name: getattr(delivery, c.name) for c in delivery.__table__.columns}
@@ -70,7 +73,7 @@ class WebhookService:
             results.append(d_dict)
         return results
 
-    def get_subscription_status(self, name: str = None, code: str = None) -> List[dict]:
+    def get_subscription_status(self, code: str = None) -> List[dict]:
         # Logic from manager.py moved here
         # We fetch all "ontology.activated" webhooks and then filter in memory or via repo
         target_code = code
@@ -114,7 +117,8 @@ class WebhookService:
                 "target_url": wh.target_url,
                 "latest_success_version": version,
                 "delivered_at": delivered_at,
-                "is_global": not wh.ontology_filter
+                "is_global": not wh.ontology_code,
+                "code": target_code
             })
         return results
 
@@ -143,7 +147,7 @@ class WebhookService:
                 event_type="ping",
                 save_log=False,  # 不记录日志
                 secret_token=webhook.secret_token,
-                ontology_name="SYSTEM_PING"
+                ontology_code="SYSTEM_PING"
             )
             return ServiceResult.success_result({
                 "status": result["status"],
@@ -153,9 +157,9 @@ class WebhookService:
         except Exception as e:
             return ServiceResult.failure_result(ServiceStatus.FAILURE, str(e))
 
-    def broadcast_event(self, event_type: str, payload: dict, ontology_name: str, background_tasks, file_path: str = None, db: Session = None):
+    def broadcast_event(self, event_type: str, payload: dict, ontology_code: str, background_tasks, file_path: str = None, db: Session = None):
         """Find matching webhooks and add broadcast task to background_tasks."""
-        webhooks = self.repo.get_webhooks_by_event(event_type, ontology_name=ontology_name)
+        webhooks = self.repo.get_webhooks_by_event(event_type, ontology_code=ontology_code)
         
         webhook_requests = []
         for wh in webhooks:
@@ -166,7 +170,7 @@ class WebhookService:
                 "event_type": event_type,
                 "file_path": file_path,
                 "secret_token": wh.secret_token,
-                "ontology_name": ontology_name,
+                "ontology_code": ontology_code,
                 "db": db
             })
 
@@ -184,14 +188,13 @@ class WebhookService:
                 business_code=BusinessCode.WEBHOOK_NOT_FOUND
             )
 
-        # 构造激活事件 payload
+        # 构造激活事件 payload (归一化字段)
         payload = {
             "event": "ontology.activated",
             "id": package.id,
-            "package_id": package.id,
             "code": getattr(package, 'series_code', None) or getattr(package, 'code', None),
-            "name": getattr(package.series, 'name', None) if hasattr(package, 'series') and package.series else getattr(package, 'name', 'Unknown'),
             "version": package.version,
+            "name": getattr(package.series, 'name', None) if hasattr(package, 'series') and package.series else getattr(package, 'name', 'Unknown'),
             "is_active": package.is_active,
             "timestamp": utils.time.time()
         }
@@ -204,7 +207,7 @@ class WebhookService:
             "event_type": "ontology.activated",
             "file_path": file_path,
             "secret_token": webhook.secret_token,
-            "ontology_name": package.series_code # Use Code 
+            "ontology_code": payload["code"]
         }
         
         if sync:
@@ -215,11 +218,11 @@ class WebhookService:
             background_tasks.add_task(utils.broadcast_webhook_requests, [request])
             return ServiceResult.success_result({"status": "queued"})
 
-    def get_ontology_delivery_status(self, package_id: str, ontology_name: str = None) -> List[dict]:
+    def get_ontology_delivery_status(self, package_id: str, ontology_code: str = None) -> List[dict]:
         """准确聚合特定本体版本的推送状态"""
         # 1. 获取针对该事件及其本体过滤器的所有已激活 Webhook
-        # 必须传入 ontology_name，否则会包含不相关的 Webhook，导致永远显示 PENDING
-        webhooks = self.repo.get_webhooks_by_event("ontology.activated", ontology_name=ontology_name)
+        # 必须传入 ontology_code，否则会包含不相关的 Webhook，导致永远显示 PENDING
+        webhooks = self.repo.get_webhooks_by_event("ontology.activated", ontology_code=ontology_code)
         
         # 2. 获取该包的所有推送记录
         deliveries = self.repo.get_deliveries_by_package_id(package_id)

@@ -29,7 +29,7 @@ def _broadcast_activation(package, service, webhook_service, background_tasks):
     webhook_service.broadcast_event(
         event_type="ontology.activated",
         payload=payload,
-        ontology_name=package.code,
+        ontology_code=package.code,
         background_tasks=background_tasks,
         file_path=service.get_source_zip_path(package.id),
         db=service.onto_repo.db
@@ -55,7 +55,7 @@ async def create_ontology_series(
     result = await service.create_ontology(file, code=code, custom_id=custom_id, name=name, template_id=template_id, is_initial=True)
     package = handle_result(result)
     
-    matching_webhooks = webhook_service.repo.get_webhooks_by_event("ontology.activated", ontology_name=code)
+    matching_webhooks = webhook_service.repo.get_webhooks_by_event("ontology.activated", ontology_code=code)
     subscriber_count = len(matching_webhooks)
 
     if auto_push:
@@ -89,7 +89,7 @@ async def add_ontology_version(
     result = await service.create_ontology(file, code=code, custom_id=custom_id, name=None, template_id=template_id, is_initial=False)
     package = handle_result(result)
     
-    matching_webhooks = webhook_service.repo.get_webhooks_by_event("ontology.activated", ontology_name=code)
+    matching_webhooks = webhook_service.repo.get_webhooks_by_event("ontology.activated", ontology_code=code)
     subscriber_count = len(matching_webhooks)
 
     if auto_push:
@@ -218,7 +218,7 @@ def activate_ontology(
     webhook_service.broadcast_event(
         event_type="ontology.activated",
         payload=payload,
-        ontology_name=package.code,
+        ontology_code=package.code,
         background_tasks=background_tasks,
         file_path=service.get_source_zip_path(package.id)
     )

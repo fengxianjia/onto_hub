@@ -21,7 +21,7 @@ class WebhookRepository:
             name=webhook_in.name or "Webhook",
             target_url=webhook_in.target_url,
             event_type=webhook_in.event_type,
-            ontology_filter=webhook_in.ontology_filter,
+            ontology_code=webhook_in.ontology_code,
             secret_token=webhook_in.secret_token
         )
         self.db.add(db_webhook)
@@ -55,32 +55,26 @@ class WebhookRepository:
         webhook.name = update_in.name or webhook.name
         webhook.target_url = update_in.target_url
         webhook.event_type = update_in.event_type
-        webhook.ontology_filter = update_in.ontology_filter
+        webhook.ontology_code = update_in.ontology_code
         webhook.secret_token = update_in.secret_token
         
         self.db.commit()
         self.db.refresh(webhook)
         return webhook
 
-    def get_webhooks_by_event(self, event_type: str, ontology_name: str = None, ontology_code: str = None) -> List[models.Webhook]:
+    def get_webhooks_by_event(self, event_type: str, ontology_code: str = None) -> List[models.Webhook]:
         query = self.db.query(models.Webhook).filter(models.Webhook.event_type == event_type)
         
-        # Logic: 
-        # 1. Global webhooks (filter is None or empty) -> ALWAYS include
-        # 2. Filter matches name -> include
-        # 3. Filter matches code -> include
+        # 1. 全局 Webhook (过滤器为空)
+        # 2. 过滤器匹配本体编码
         
-        # Construct OR conditions
         conditions = [
-            models.Webhook.ontology_filter == None,
-            models.Webhook.ontology_filter == ""
+            models.Webhook.ontology_code == None,
+            models.Webhook.ontology_code == ""
         ]
         
-        if ontology_name:
-            conditions.append(models.Webhook.ontology_filter == ontology_name)
-        
         if ontology_code:
-            conditions.append(models.Webhook.ontology_filter == ontology_code)
+            conditions.append(models.Webhook.ontology_code == ontology_code)
             
         query = query.filter(or_(*conditions))
         return query.all()
@@ -88,7 +82,7 @@ class WebhookRepository:
     def create_delivery(self, 
         webhook_id: str, 
         event_type: str, 
-        ontology_name: str, 
+        ontology_code: str, 
         payload: str, 
         status: str, 
         response_status: int = None, 
@@ -97,7 +91,7 @@ class WebhookRepository:
         db_delivery = models.WebhookDelivery(
             webhook_id=webhook_id,
             event_type=event_type,
-            ontology_name=ontology_name,
+            ontology_code=ontology_code,
             payload=payload,
             status=status,
             response_status=response_status,
@@ -107,20 +101,20 @@ class WebhookRepository:
         self.db.commit()
         return db_delivery
 
-    def get_logs_by_ontology(self, ontology_name: str, skip: int = 0, limit: int = 50) -> List[Tuple[models.WebhookDelivery, str]]:
+    def get_logs_by_ontology(self, ontology_code: str, skip: int = 0, limit: int = 50) -> List[Tuple[models.WebhookDelivery, str]]:
         return self.db.query(models.WebhookDelivery, models.Webhook.name)\
             .join(models.Webhook, models.WebhookDelivery.webhook_id == models.Webhook.id)\
-            .filter(models.WebhookDelivery.ontology_name == ontology_name)\
+            .filter(models.WebhookDelivery.ontology_code == ontology_code)\
             .order_by(desc(models.WebhookDelivery.created_at))\
             .offset(skip).limit(limit).all()
 
-    def get_logs_by_webhook(self, webhook_id: str, ontology_name: str = None, status: str = None, skip: int = 0, limit: int = 20) -> Tuple[List[Tuple[models.WebhookDelivery, str]], int]:
+    def get_logs_by_webhook(self, webhook_id: str, ontology_code: str = None, status: str = None, skip: int = 0, limit: int = 20) -> Tuple[List[Tuple[models.WebhookDelivery, str]], int]:
         query = self.db.query(models.WebhookDelivery, models.Webhook.name)\
             .join(models.Webhook, models.WebhookDelivery.webhook_id == models.Webhook.id)\
             .filter(models.WebhookDelivery.webhook_id == webhook_id)
         
-        if ontology_name:
-             query = query.filter(models.WebhookDelivery.ontology_name.contains(ontology_name))
+        if ontology_code:
+             query = query.filter(models.WebhookDelivery.ontology_code.contains(ontology_code))
         
         if status:
             query = query.filter(models.WebhookDelivery.status == status)
@@ -130,11 +124,11 @@ class WebhookRepository:
             .offset(skip).limit(limit).all()
         return items, total
 
-    def get_latest_success_delivery(self, webhook_id: str, ontology_name: str) -> Optional[models.WebhookDelivery]:
+    def get_latest_success_delivery(self, webhook_id: str, ontology_code: str) -> Optional[models.WebhookDelivery]:
         return self.db.query(models.WebhookDelivery)\
             .filter(models.WebhookDelivery.webhook_id == webhook_id)\
             .filter(models.WebhookDelivery.status == "SUCCESS")\
-            .filter(models.WebhookDelivery.ontology_name == ontology_name)\
+            .filter(models.WebhookDelivery.ontology_code == ontology_code)\
             .order_by(desc(models.WebhookDelivery.created_at))\
             .first()
 
@@ -147,10 +141,9 @@ class WebhookRepository:
             .all()
 
     def get_name_by_code(self, code: str) -> Optional[str]:
-        # Helper to bridge the gap without full circular dependency on OntologyRepo
-        # We assume OntologyPackage model is available
+        # 我们使用 series_code 来匹配包
         pkg = self.db.query(models.OntologyPackage)\
-            .filter(models.OntologyPackage.code == code)\
+            .filter(models.OntologyPackage.series_code == code)\
             .order_by(desc(models.OntologyPackage.version))\
             .first()
         return pkg.name if pkg else None

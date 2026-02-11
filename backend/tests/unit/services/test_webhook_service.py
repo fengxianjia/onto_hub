@@ -36,12 +36,12 @@ class TestWebhookServiceBehavior:
         service.broadcast_event(
             event_type="ontology.activated",
             payload=payload,
-            ontology_name="test-onto",
+            ontology_code="test-onto",
             background_tasks=background_tasks
         )
         
         # Verify repository was queried correctly
-        repo.get_webhooks_by_event.assert_called_once_with("ontology.activated", ontology_name="test-onto")
+        repo.get_webhooks_by_event.assert_called_once_with("ontology.activated", ontology_code="test-onto")
         
         # Verify background task was added
         background_tasks.add_task.assert_called_once()

@@ -6,7 +6,7 @@
         <div v-if="showOntologyFilter" class="w-64">
           <Input 
             v-model="filters.ontology" 
-            placeholder="搜索本体名称/编码" 
+            placeholder="搜索本体编码 (例如: eco)" 
             @keyup.enter="handleRefresh"
           >
             <template #prefix>
@@ -63,7 +63,13 @@
               :class="['transition-all duration-200 hover:bg-accent/5', index % 2 === 0 ? 'bg-white' : 'bg-muted/20']">
             <td class="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">{{ formatDate(row.created_at) }}</td>
             <!-- Subscription Name cell removed -->
-            <td class="px-6 py-4 text-sm font-mono text-muted-foreground">{{ row.ontology_name || '-' }}</td>
+            <td class="px-6 py-4 text-sm font-medium whitespace-nowrap">
+              <div v-if="row.ontology_name" class="flex flex-col">
+                <span>{{ row.ontology_name }}</span>
+                <span class="text-[10px] text-muted-foreground font-mono opacity-60">{{ row.ontology_code }}</span>
+              </div>
+              <span v-else class="font-mono text-muted-foreground">{{ row.ontology_code || '-' }}</span>
+            </td>
             <td class="px-6 py-4">
               <Badge v-if="getOntologyVersion(row.payload)" variant="info" outline>v{{ getOntologyVersion(row.payload) }}</Badge>
               <span v-else class="text-muted-foreground">-</span>

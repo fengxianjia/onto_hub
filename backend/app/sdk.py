@@ -12,16 +12,16 @@ class OntologySDK:
     """
     
     @staticmethod
-    def subscribe(event_name: str, callback: Callable, ontology_filter: str = None):
+    def subscribe(event_name: str, callback: Callable, ontology_code: str = None):
         """
         订阅本地事件
         :param event_name: 事件名称, 如 'ontology.activated'
         :param callback: 回调函数, 接收 payload 字典
-        :param ontology_filter: 可选, 仅订阅指定名称的本体
+        :param ontology_code: 可选, 仅订阅指定编码的本体
         """
         # 使用解耦后的 dispatcher
-        dispatcher.subscribe(event_name, callback, ontology_filter)
-        logger.info(f"SDK Subscriber registered for {event_name} (filter: {ontology_filter})")
+        dispatcher.subscribe(event_name, callback, ontology_code)
+        logger.info(f"SDK Subscriber registered for {event_name} (filter: {ontology_code})")
 
     @staticmethod
     def get_ontologies(api_base_url: str, skip: int = 0, limit: int = 100):

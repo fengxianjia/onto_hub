@@ -61,7 +61,7 @@ class WebhookBase(BaseModel):
     name: Optional[str] = Field("Webhook", description="回调配置名称", examples=["钉钉通知"])
     target_url: str = Field(..., description="接收 POST 请求的目标 URL", examples=["https://api.example.com/webhook"])
     event_type: str = Field("ontology.activated", description="触发事件类型 (ontology.activated)", examples=["ontology.activated"])
-    ontology_filter: Optional[str] = Field(None, description="过滤特定的本体编码，为空则订阅所有", examples=["eco"])
+    ontology_code: Optional[str] = Field(None, description="过滤特定的本体编码，为空则订阅所有", examples=["eco"])
     secret_token: Optional[str] = Field(None, description="用于签名验证的共享密钥 (签名算法: HMAC-SHA256)")
 
 class WebhookCreate(WebhookBase):
@@ -81,9 +81,10 @@ class PaginatedWebhookResponse(BaseModel):
 class WebhookDeliveryResponse(BaseModel):
     id: str
     webhook_id: str
-    webhook_name: Optional[str] = None # 用于 UI 显示
+    webhook_name: Optional[str] = None # 用于 UI 显示 Webhook 配置名
     event_type: str
-    ontology_name: Optional[str] = None # 用于性能优化
+    ontology_code: Optional[str] = Field(None, description="本体编码")
+    ontology_name: Optional[str] = None # 用于 UI 显示本体名称
     payload: str | None = None  # Add this field
     status: str
     response_status: int | None = None
