@@ -130,7 +130,6 @@ async def update_ontology_metadata(
 
 @router.post(
     "/packages/{package_id}/reparse", 
-    response_model=schemas.OntologyPackageResponse,
     summary="重新解析本体 (异步)"
 )
 async def reparse_ontology(

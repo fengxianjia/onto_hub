@@ -60,7 +60,7 @@ class OntologyService:
                 final_template_id = series.default_template_id if series else None
         
         if not final_template_id:
-            return ServiceResult.failure_result(ServiceStatus.FAILURE, "No parsing template associated with this ontology")
+            return ServiceResult.failure_result(ServiceStatus.BAD_REQUEST, "No parsing template associated with this ontology")
         
         # We don't background task here, we just return the template_id to use
         # The caller (main.py) will add it to background tasks

@@ -46,6 +46,7 @@ def handle_result(result: ServiceResult):
         ServiceStatus.DUPLICATE_NAME: (BusinessCode.VALIDATION_ERROR, 400),
         ServiceStatus.RESOURCE_IN_USE: (BusinessCode.RESOURCE_IN_USE, 400),
         ServiceStatus.VERSION_ACTIVE: (BusinessCode.VERSION_ACTIVE, 400),
+        ServiceStatus.BAD_REQUEST: (BusinessCode.VALIDATION_ERROR, 400),
         ServiceStatus.FAILURE: (BusinessCode.INTERNAL_ERROR, 500),
     }
     

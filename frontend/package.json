@@ -13,6 +13,7 @@
     "@vueuse/motion": "^3.0.3",
     "axios": "^1.13.4",
     "element-plus": "^2.13.2",
+    "force-graph": "^1.51.1",
     "github-markdown-css": "^5.9.0",
     "markdown-it": "^14.1.0",
     "v-code-diff": "^1.13.1",

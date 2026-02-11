@@ -1,125 +1,133 @@
 <template>
-  <div class="h-full flex flex-col">
-    <div v-if="loading" class="flex-1 flex justify-center items-center">
-      <Loading />
-    </div>
-    <div v-else-if="nodes.length === 0" class="flex-1 flex justify-center items-center">
-      <Empty description="暂无图谱数据,请确认本体解析是否完成" />
-    </div>
-    
-    <!-- Graph container -->
-    <div 
-      v-else
-      ref="graphContainer" 
-      class="flex-1 relative border rounded-lg overflow-hidden bg-white"
-    >
-      <v-network-graph
-        v-show="graphVisible"
-        ref="graph"
-        class="graph"
-        :nodes="nodes"
-        :edges="edges"
-        :layouts="layouts"
-        :configs="configs"
-        :event-handlers="eventHandlers"
-      >
-        <template #edge-label="{ edge, ...slotProps }">
-          <v-edge-label :text="edge.label" align="center" vertical-align="above" v-bind="slotProps" />
-        </template>
-      </v-network-graph>
-
-      <!-- Layout Switcher & Fullscreen Button -->
-      <div class="absolute top-4 left-4 bg-white shadow-md rounded-md border border-border p-1 flex gap-1 z-10">
-          <button 
-            @click="setLayout('force')"
-            :class="['px-3 py-1 text-xs font-medium rounded transition-colors', layoutMode === 'force' ? 'bg-accent text-white' : 'text-muted-foreground hover:bg-muted']"
-          >
-            力导向 (Force)
-          </button>
-          <button 
-            @click="setLayout('star')"
-            :class="['px-3 py-1 text-xs font-medium rounded transition-colors', layoutMode === 'star' ? 'bg-accent text-white' : 'text-muted-foreground hover:bg-muted']"
-          >
-            星图 (Star Map)
-          </button>
-          <div class="w-px bg-border mx-1"></div>
-          <button 
-            @click="toggleFullscreen"
-            :title="isFullscreen ? '退出全屏 (ESC)' : '全屏显示'"
-            class="px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-          >
-            <svg v-if="!isFullscreen" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-            </svg>
-            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
+  <div class="h-full flex flex-col relative bg-white">
+    <!-- Header Toolbar -->
+    <div class="p-4 border-b flex items-center justify-between gap-4 z-20 bg-white/80 backdrop-blur-md">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-muted-foreground uppercase tracking-wider">显示节点:</span>
+          <div class="flex gap-1">
+            <Badge 
+              v-for="cat in allCategories" 
+              :key="cat"
+              :variant="activeFilters.includes(cat) ? 'info' : 'outline'"
+              class="cursor-pointer transition-all hover:scale-105"
+              @click="toggleFilter(cat)"
+            >
+              {{ cat }}
+            </Badge>
+          </div>
+        </div>
       </div>
       
-      <!-- Node Detail Panel -->
-      <div v-if="selectedNode" class="absolute right-0 top-0 bottom-0 w-80 bg-white shadow-lg border-l p-4 overflow-y-auto transition-transform duration-300">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="font-bold text-lg">{{ selectedNode.name }}</h3>
-          <button @click="selectedNode = null" class="text-muted-foreground hover:text-foreground">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="space-y-2 text-sm">
-          <div class="flex">
-            <span class="w-20 font-medium text-muted-foreground">分类:</span>
-            <Badge variant="info" size="xs">{{ selectedNode.category }}</Badge>
-          </div>
-          <div class="flex">
-             <span class="w-20 font-medium text-muted-foreground">文件:</span>
-             <span class="truncate" :title="selectedNode.file_path">{{ selectedNode.file_path }}</span>
-          </div>
-           <div class="mt-4">
-             <h4 class="font-medium mb-2 border-b pb-1">属性 (Attributes)</h4>
-             <table class="w-full text-xs">
-               <tbody>
-                 <tr v-for="(value, key) in parseMetadata(selectedNode.metadata)" :key="key" class="border-b last:border-0 border-dashed border-gray-200">
-                   <td class="py-1 pr-2 font-medium text-muted-foreground w-1/3 break-words align-top">{{ key }}</td>
-                   <td class="py-1 text-foreground w-2/3 break-words">
-                      <div v-if="Array.isArray(value) && value.length > 0 && typeof value[0] === 'object'" class="overflow-x-auto">
-                        <table class="w-full border-collapse mt-1 mb-1">
-                          <thead>
-                            <tr class="bg-muted/50">
-                              <th v-for="(h, i) in Object.keys(value[0])" :key="i" class="p-1 text-left font-semibold border border-border">{{ h }}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr v-for="(row, r) in value" :key="r">
-                               <td v-for="(cell, c) in Object.values(row)" :key="c" class="p-1 border border-border">{{ cell }}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <ul v-else-if="Array.isArray(value)" class="list-disc list-inside">
-                        <li v-for="(item, i) in value" :key="i">{{ item }}</li>
-                      </ul>
-                      <span v-else>{{ value }}</span>
-                   </td>
-                 </tr>
-               </tbody>
-             </table>
-             <div v-if="Object.keys(parseMetadata(selectedNode.metadata)).length === 0" class="text-xs text-muted-foreground italic py-2">
-               无额外属性
-             </div>
-           </div>
-        </div>
+      <div class="flex items-center gap-2">
+        <Button variant="ghost" size="sm" @click="resetView" title="重置视角">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        </Button>
+        <div class="w-px h-4 bg-border mx-1"></div>
+        <button 
+          @click="toggleFullscreen"
+          class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all"
+        >
+          <svg v-if="!isFullscreen" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+          </svg>
+          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
     </div>
+
+    <!-- Main Graph Area -->
+    <div class="flex-1 overflow-hidden relative" ref="container">
+      <div v-if="loading" class="absolute inset-0 flex justify-center items-center z-10 bg-white/50">
+        <Loading />
+      </div>
+      <div v-else-if="!hasData" class="absolute inset-0 flex justify-center items-center z-10">
+        <Empty description="暂无图谱数据,请确认本体解析是否完成" />
+      </div>
+      
+      <!-- Force Graph Container -->
+      <div ref="graphContainer" class="w-full h-full"></div>
+
+      <!-- Quick Node Info (Floating) -->
+      <transition name="slide-fade">
+        <div v-if="hoveredNode" class="absolute bottom-6 left-6 max-w-sm bg-white/90 backdrop-blur-md border shadow-2xl rounded-xl p-4 pointer-events-none z-30">
+          <div class="flex items-center gap-2 mb-1">
+            <div class="w-2 h-2 rounded-full" :style="{ backgroundColor: getCategoryColor(hoveredNode.category) }"></div>
+            <span class="text-xs font-bold text-muted-foreground uppercase opacity-70">{{ hoveredNode.category }}</span>
+          </div>
+          <h4 class="font-bold text-lg text-foreground truncate">{{ hoveredNode.name }}</h4>
+          <p class="text-xs text-muted-foreground font-mono mt-1 opacity-60">{{ hoveredNode.file_path }}</p>
+        </div>
+      </transition>
+    </div>
+
+    <!-- Detail Side Drawer (Logic moved out or reused) -->
+    <!-- We keep the existing selectedNode logic but make it optional -->
+    <transition name="slide">
+      <div v-if="selectedNode" class="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] border-l p-6 overflow-y-auto z-40">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-black text-2xl tracking-tight text-foreground">{{ selectedNode.name }}</h3>
+          <button @click="selectedNode = null" class="p-2 hover:bg-muted rounded-full transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <!-- ... content remains similar but better styled ... -->
+        <div class="space-y-6">
+          <section>
+            <div class="flex items-center gap-3 mb-2">
+              <span class="text-xs font-bold py-1 px-2 bg-accent/10 text-accent rounded uppercase tracking-widest">{{ selectedNode.category }}</span>
+              <span class="text-xs text-muted-foreground font-mono truncate">{{ selectedNode.id.split('-')[0] }}...</span>
+            </div>
+            <p class="text-sm text-muted-foreground font-mono bg-muted p-2 rounded break-all">{{ selectedNode.file_path }}</p>
+          </section>
+
+          <section v-if="Object.keys(parseMetadata(selectedNode.metadata_json)).length">
+            <h4 class="text-sm font-bold border-b pb-2 mb-4 flex items-center gap-2">
+              <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              扩展属性
+            </h4>
+            <div class="space-y-4">
+              <div v-for="(val, key) in parseMetadata(selectedNode.metadata_json)" :key="key" class="group">
+                <label class="text-[10px] font-bold text-muted-foreground uppercase opacity-50 block transition-opacity group-hover:opacity-100">{{ key }}</label>
+                <div class="mt-1">
+                  <!-- Complex values (arrays/objects) -->
+                  <div v-if="Array.isArray(val) && val.length > 0 && typeof val[0] === 'object'" class="overflow-x-auto">
+                    <table class="w-full border text-[11px] bg-muted/30">
+                      <thead>
+                        <tr class="bg-muted">
+                          <th v-for="(h, i) in Object.keys(val[0])" :key="i" class="p-1 border text-left">{{ h }}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, r) in val" :key="r">
+                          <td v-for="(cell, c) in Object.values(row)" :key="c" class="p-1 border">{{ cell }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <ul v-else-if="Array.isArray(val)" class="list-disc list-inside text-sm text-foreground">
+                    <li v-for="(item, i) in val" :key="i">{{ item }}</li>
+                  </ul>
+                  <div v-else class="text-sm text-foreground break-words leading-relaxed">
+                    {{ val }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import axios from 'axios'
-import { Loading, Empty, Badge } from './index.js'
-// Note: User needs to install v-network-graph
-import { VNetworkGraph, VEdgeLabel } from "v-network-graph"
-import "v-network-graph/lib/style.css"
+import ForceGraph from 'force-graph'
+import { Loading, Empty, Badge, Button } from './index.js'
 
 const props = defineProps({
   ontologyId: {
@@ -128,325 +136,246 @@ const props = defineProps({
   }
 })
 
+// State
+const container = ref(null)
+const graphContainer = ref(null)
+const graphInstance = ref(null)
 const loading = ref(false)
-const nodes = ref({})
-const edges = ref({})
-const layouts = ref({ nodes: {} })
+const rawData = ref({ nodes: [], links: [] })
 const selectedNode = ref(null)
-const layoutMode = ref('force')
-const graph = ref(null)
-const graphVisible = ref(true) // Control visibility during star map initialization
-const isFullscreen = ref(false) // Fullscreen mode state
-const graphMounted = ref(false) // Track if graph has been mounted
+const hoveredNode = ref(null)
+const isFullscreen = ref(false)
+const activeFilters = ref([])
 
-const configs = ref({
-  node: {
-    normal: {
-      type: "circle",
-      radius: 16, // Smaller nodes
-      color: "#4460EF",
-    },
-    hover: {
-      color: "#6b7fff",
-    },
-    label: {
-      visible: true,
-      fontFamily: "Inter, sans-serif",
-      fontSize: 11,
-    },
-  },
-  edge: {
-    normal: {
-      color: "#cbd5e1",
-      width: 1, // Thinner edges
-    },
-    marker: {
-      target: {
-        type: "arrow",
-        width: 3,
-        height: 3,
-      },
-    },
-  },
-})
+// Config constants
+const COLORS = [
+  '#4460EF', // Indigo
+  '#10B981', // Emerald
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+  '#8B5CF6', // Violet
+  '#EC4899', // Pink
+  '#06B6D4'  // Cyan
+]
 
-const eventHandlers = {
-  "node:click": ({ node }) => {
-    selectedNode.value = nodes.value[node]
-  },
+const categoryColorMap = {}
+const getCategoryColor = (cat) => {
+  if (!cat) return '#94a3b8'
+  if (!categoryColorMap[cat]) {
+    const idx = Object.keys(categoryColorMap).length % COLORS.length
+    categoryColorMap[cat] = COLORS[idx]
+  }
+  return categoryColorMap[cat]
 }
 
+// Computed
+const allCategories = computed(() => {
+  const cats = new Set(rawData.value.nodes.map(n => n.category))
+  return Array.from(cats).filter(Boolean)
+})
+
+const hasData = computed(() => rawData.value.nodes.length > 0)
+
+const filteredData = computed(() => {
+  if (activeFilters.value.length === 0) return rawData.value
+  
+  const filteredNodes = rawData.value.nodes.filter(n => activeFilters.value.includes(n.category))
+  const nodeIds = new Set(filteredNodes.map(n => n.id))
+  const filteredLinks = rawData.value.links.filter(l => nodeIds.has(l.source_id) && nodeIds.has(l.target_id))
+  
+  return { nodes: filteredNodes, links: filteredLinks }
+})
+
+// Methods
 const fetchGraph = async () => {
   loading.value = true
-  selectedNode.value = null
   try {
     const res = await axios.get(`/api/ontologies/${props.ontologyId}/graph`)
-    // Convert array to object for v-network-graph
-    const nodesObj = {}
-    res.data.nodes.forEach(n => {
-      nodesObj[n.id] = { ...n, name: n.name, metadata: n.metadata_json } 
-    })
-    
-    const edgesObj = {}
-    res.data.links.forEach(l => {
-      edgesObj[l.id] = { 
-        source: l.source_id,  // FIX: Use source_id
-        target: l.target_id,  // FIX: Use target_id
-        label: l.relation_type 
-      }
-    })
-    
-    nodes.value = nodesObj
-    edges.value = edgesObj
-    
-    // Apply current layout mode
-    if (layoutMode.value === 'star') {
-        applyStarLayout()
-    } else {
-        // Force mode: clear all layouts to let force engine work
-        layouts.value = { nodes: {} }
-        setTimeout(() => {
-            try { graph.value?.fitToContents() } catch (e) {}
-        }, 1000)
-    }
+    rawData.value = res.data
+    // Initialize filters with all categories
+    activeFilters.value = allCategories.value
+    await nextTick()
+    initGraph()
   } catch (e) {
-    console.error(e)
+    console.error('Failed to fetch graph:', e)
   } finally {
     loading.value = false
   }
 }
 
-const graphContainer = ref(null)
-
-// ...
-
-// ...
-
-const applyStarLayout = async () => {
-    const count = Object.keys(nodes.value).length
-    if (count === 0) return
-
-    // HIDE graph during initialization to prevent flash
-    graphVisible.value = false
-
-    const center = { x: 0, y: 0 }
-    const nodeIds = Object.keys(nodes.value).sort()
-    
-    // REVERSE APPROACH: Start with a large ring, then contract inward
-    // This makes auto-fitting much easier!
-    
-    // 1. Create initial LARGE ring (will be auto-fitted by fitToContents)
-    const largeRadius = 800 // Large enough to ensure fitToContents will scale it down
-    const initialNodes = {}
-    const shuffledIds = [...nodeIds].sort(() => Math.random() - 0.5)
-    
-    for (let i = 0; i < shuffledIds.length; i++) {
-        const nodeId = shuffledIds[i]
-        const angle = Math.random() * 2 * Math.PI
-        // All nodes start at the large radius (outer ring)
-        initialNodes[nodeId] = {
-            x: center.x + largeRadius * Math.cos(angle),
-            y: center.y + largeRadius * Math.sin(angle),
-            fixed: true
-        }
-    }
-    
-    // Set initial positions
-    layouts.value = { nodes: initialNodes }
-    
-    // 2. Wait for layout to be set, then fit
-    await new Promise(resolve => setTimeout(resolve, 50))
-    
-    try {
-        graph.value?.fitToContents()
-    } catch(e) {}
-    
-    // 3. Wait for fit to complete, then SHOW graph
-    await new Promise(resolve => setTimeout(resolve, 100))
-    graphVisible.value = true
-    
-    // 4. Now contract to final star map positions
-    // The key: we keep the same angles, but reduce the radius with jitter
-    const finalNodes = {}
-    
-    for (let i = 0; i < shuffledIds.length; i++) {
-        const nodeId = shuffledIds[i]
-        const initial = initialNodes[nodeId]
-        
-        // Calculate angle from initial position
-        const angle = Math.atan2(initial.y - center.y, initial.x - center.x)
-        
-        // Contract to 10%-40% of the initial radius for compact star map
-        const contractionFactor = 0.1 + Math.random() * 0.3
-        const finalRadius = largeRadius * contractionFactor
-        
-        finalNodes[nodeId] = {
-            x: center.x + finalRadius * Math.cos(angle),
-            y: center.y + finalRadius * Math.sin(angle),
-            fixed: true
-        }
-    }
-    
-    // 5. Animate contraction (no fitToContents - keep the explosion effect)
-    animateExpansion(initialNodes, finalNodes, 2000, false)
-}
-
-const animateExpansion = (startLayout, endLayout, duration, shouldFitAfter = true) => {
-    const startTime = performance.now()
-    
-    const animate = (time) => {
-        const elapsed = time - startTime
-        const progress = Math.min(elapsed / duration, 1)
-        // Ease out cubic
-        const ease = 1 - Math.pow(1 - progress, 3)
-        
-        const currentNodes = {}
-        for (const nodeId in startLayout) {
-             const start = startLayout[nodeId]
-             const end = endLayout[nodeId]
-             if (!end) continue
-             
-             currentNodes[nodeId] = {
-                 x: start.x + (end.x - start.x) * ease,
-                 y: start.y + (end.y - start.y) * ease,
-                 fixed: true
-             }
-        }
-        layouts.value = { nodes: currentNodes }
-        
-        if (progress < 1) {
-            requestAnimationFrame(animate)
-        } else if (shouldFitAfter) {
-            // Animation complete, fit to contents for proper view (only if requested)
-            setTimeout(() => {
-                try {
-                    graph.value?.fitToContents()
-                } catch(e) {}
-            }, 100)
-        }
-    }
-    requestAnimationFrame(animate)
-}
-
-
-const applyForceLayout = async () => {
-    // Strategy: Since clearing layouts doesn't work reliably,
-    // we'll refetch the graph data to get a clean slate
-    // This mimics what happens when switching tabs (which works)
-    
-    graphVisible.value = true // Ensure graph is visible
-    
-    // Simply refetch the graph - this will reset everything
-    await fetchGraph()
-}
-
-const toggleFullscreen = async () => {
-  console.log('toggleFullscreen called, current state:', isFullscreen.value)
-  const wasFullscreen = isFullscreen.value
+const toggleFilter = (cat) => {
+  const isOnlyOne = activeFilters.value.length === 1 && activeFilters.value.includes(cat)
+  if (isOnlyOne) return // 禁止取消最后一个，防止界面全空
   
-  if (!wasFullscreen) {
-    // Enter fullscreen using native API
-    try {
-      if (graphContainer.value) {
-        await graphContainer.value.requestFullscreen()
-        isFullscreen.value = true
-        console.log('Entered fullscreen')
-        
-        // If in star map mode, replay animation after entering fullscreen
-        if (layoutMode.value === 'star') {
-          setTimeout(() => {
-            applyStarLayout()
-          }, 100)
-        } else {
-          // Re-fit for other modes
-          setTimeout(() => {
-            try { graph.value?.fitToContents() } catch (e) {}
-          }, 100)
-        }
-      }
-    } catch (err) {
-      console.error('Failed to enter fullscreen:', err)
-    }
+  const idx = activeFilters.value.indexOf(cat)
+  if (idx > -1) {
+    activeFilters.value.splice(idx, 1)
   } else {
-    // Exit fullscreen
-    try {
-      await document.exitFullscreen()
-      isFullscreen.value = false
-      console.log('Exited fullscreen')
-    } catch (err) {
-      console.error('Failed to exit fullscreen:', err)
-    }
+    activeFilters.value.push(cat)
+  }
+  updateGraphData()
+}
+
+const resetView = () => {
+  graphInstance.value?.zoomToFit(800)
+}
+
+const toggleFullscreen = () => {
+  if (!document.fullscreenElement) {
+    container.value?.requestFullscreen().catch(err => {
+      console.error(`Error attempting to enable full-screen mode: ${err.message}`)
+    })
+  } else {
+    document.exitFullscreen()
   }
 }
 
-const setLayout = (mode) => {
-    layoutMode.value = mode
-    if (mode === 'star') {
-        applyStarLayout()
-    } else {
-        applyForceLayout()
-    }
+const initGraph = () => {
+  if (!graphContainer.value) return
+  
+  // Cleanup old instance
+  if (graphInstance.value) {
+    graphInstance.value._destructor?.()
+  }
+
+  const width = graphContainer.value.clientWidth
+  const height = graphContainer.value.clientHeight
+
+  graphInstance.value = ForceGraph()(graphContainer.value)
+    .width(width)
+    .height(height)
+    .backgroundColor('#ffffff')
+    .nodeRelSize(7)
+    .nodeId('id')
+    .nodeLabel(node => `<div class="p-2 bg-white/90 border rounded-lg shadow-xl font-sans">
+        <b class="text-accent">${node.name}</b><br/>
+        <span class="text-xs text-muted-foreground uppercase">${node.category}</span>
+      </div>`)
+    .nodeColor(node => getCategoryColor(node.category))
+    .nodeCanvasObject((node, ctx, globalScale) => {
+      const label = node.name
+      const fontSize = 12/globalScale
+      ctx.font = `${fontSize}px Inter, "Hiragino Sans GB", "Microsoft YaHei", sans-serif`
+      const textWidth = ctx.measureText(label).width
+      const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2)
+
+      // Draw shadow/halo
+      ctx.beginPath()
+      ctx.arc(node.x, node.y, 8/globalScale, 0, 2 * Math.PI, false)
+      ctx.fillStyle = getCategoryColor(node.category)
+      ctx.shadowBlur = 15/globalScale
+      ctx.shadowColor = getCategoryColor(node.category)
+      ctx.fill()
+      ctx.shadowBlur = 0
+
+      // Draw label Background
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+      ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y + 12/globalScale, bckgDimensions[0], bckgDimensions[1])
+
+      // Draw text
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#1e293b'
+      ctx.fillText(label, node.x, node.y + 12/globalScale + bckgDimensions[1] / 2)
+      
+      node.__bckgDimensions = bckgDimensions
+    })
+    .linkSource('source_id')
+    .linkTarget('target_id')
+    .linkDirectionalParticles(2)
+    .linkDirectionalParticleSpeed(d => 0.005)
+    .linkDirectionalParticleWidth(2)
+    .linkColor(() => '#e2e8f0')
+    .linkWidth(1)
+    .onNodeClick(node => {
+      selectedNode.value = node
+      graphInstance.value.centerAt(node.x, node.y, 400)
+    })
+    .onNodeHover(node => {
+      hoveredNode.value = node
+    })
+    .onBackgroundClick(() => {
+      selectedNode.value = null
+    })
+
+  updateGraphData()
 }
 
-const parseMetadata = (jsonStr) => {
+const updateGraphData = () => {
+  if (!graphInstance.value) return
+  graphInstance.value.graphData(filteredData.value)
+}
+
+const parseMetadata = (metadata) => {
+  if (!metadata) return {}
+  if (typeof metadata === 'object') return metadata
   try {
-    return JSON.parse(jsonStr) || {}
-  } catch(e) {
+    return JSON.parse(metadata)
+  } catch (e) {
     return {}
   }
 }
 
-watch(() => props.ontologyId, () => {
-  if (props.ontologyId) fetchGraph()
+const formatValue = (val) => {
+  if (Array.isArray(val)) {
+    return val.join(', ')
+  }
+  if (typeof val === 'object') {
+    return JSON.stringify(val)
+  }
+  return val
+}
+
+// Lifecycle
+onMounted(() => {
+  fetchGraph()
+  window.addEventListener('resize', handleResize)
+  document.addEventListener('fullscreenchange', handleFullscreenChange)
 })
 
-onMounted(() => {
-  graphMounted.value = true
-  fetchGraph()
-  
-  // Listen for fullscreen changes (including ESC key)
-  const handleFullscreenChange = () => {
-    isFullscreen.value = !!document.fullscreenElement
-    console.log('Fullscreen changed:', isFullscreen.value)
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  if (graphInstance.value) {
+    graphInstance.value._destructor?.()
   }
-  document.addEventListener('fullscreenchange', handleFullscreenChange)
-  
-  // ESC key handler for exiting fullscreen (backup)
-  const handleKeydown = (e) => {
-    if (e.key === 'Escape' && isFullscreen.value) {
-      // The fullscreenchange event will handle the state update
-      document.exitFullscreen().catch(() => {})
-    }
-  }
-  window.addEventListener('keydown', handleKeydown)
-  
-  // Cleanup on unmount
-  onUnmounted(() => {
-    document.removeEventListener('fullscreenchange', handleFullscreenChange)
-    window.removeEventListener('keydown', handleKeydown)
-  })
 })
+
+const handleResize = () => {
+  if (graphInstance.value && graphContainer.value) {
+    graphInstance.value.width(graphContainer.value.clientWidth)
+    graphInstance.value.height(graphContainer.value.clientHeight)
+  }
+}
+
+const handleFullscreenChange = () => {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+watch(() => props.ontologyId, fetchGraph)
 </script>
 
 <style scoped>
-.graph {
-  width: 100%;
-  height: 100%;
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+.slide-fade-leave-active {
+  transition: all 0.5s cubic-bezier(1, 0.5, 0.8, 1);
+}
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(20px);
+  opacity: 0;
 }
 
-/* Smooth transition for fullscreen */
-.fixed {
-  transition: all 0.3s ease-in-out;
+.slide-enter-active, .slide-leave-active {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-enter-from, .slide-leave-to {
+  transform: translateX(100%);
 }
 
-/* Breathing animation for Star Map nodes */
-:deep(.v-ng-node-circle) {
-    animation: breathe 4s infinite ease-in-out alternate;
-    transform-origin: center;
-}
-
-@keyframes breathe {
-    0% { transform: scale(1); }
-    100% { transform: scale(1.15); }
+canvas {
+  outline: none;
 }
 </style>

@@ -200,3 +200,58 @@ class TestOntologyDeletionAPI:
         del_resp = client.delete(f"/api/ontologies/{pkg_id}")
         # handle_result throws 400 for VERSION_ACTIVE
         assert del_resp.status_code == 400
+@pytest.mark.integration
+class TestOntologyReparseAPI:
+    """Test the manual re-parsing endpoint."""
+
+    def test_reparse_ontology_no_template_fails(self, client, sample_ontology_zip):
+        """Should fail if no template is associated and none provided."""
+        code = f"reparse-fail-{int(time.time() * 1000)}"
+        # Create without template
+        with open(sample_ontology_zip, 'rb') as f:
+            resp = client.post(
+                "/api/ontologies?is_initial=true",
+                data={"code": code, "name": "No Template Onto"},
+                files={"file": ("test.zip", f, "application/zip")}
+            )
+        pkg_id = resp.json()["id"]
+
+        # Attempt to reparse without specifying template
+        response = client.post(f"/api/ontologies/packages/{pkg_id}/reparse")
+        assert response.status_code == 400
+        assert "No parsing template associated" in response.json()["detail"]
+
+    def test_reparse_ontology_success(self, client, sample_ontology_zip):
+        """Successfully trigger re-parsing (Success means 200 message returned)."""
+        # 1. Create a template first
+        tpl_name = f"Tpl-{int(time.time())}"
+        tpl_resp = client.post("/api/templates/", json={
+            "name": tpl_name,
+            "parser_type": "markdown",
+            "rules": "{}"
+        })
+        tpl_id = tpl_resp.json()["id"]
+
+        # 2. Upload ontology
+        code = f"reparse-ok-{int(time.time() * 1000)}"
+        with open(sample_ontology_zip, 'rb') as f:
+            client.post(
+                "/api/ontologies?is_initial=true",
+                data={"code": code, "name": "Reparse Target", "template_id": tpl_id},
+                files={"file": ("test.zip", f, "application/zip")}
+            )
+        
+        # Get latest package
+        pkg_resp = client.get(f"/api/ontologies")
+        pkg = next(p for p in pkg_resp.json()["items"] if p["code"] == code)
+        pkg_id = pkg["id"]
+
+        # 3. Trigger reparse
+        reparse_resp = client.post(f"/api/ontologies/packages/{pkg_id}/reparse")
+        
+        # This is where the ResponseValidationError happened before!
+        # Now it should return 200 with the message dictionary.
+        assert reparse_resp.status_code == 200
+        data = reparse_resp.json()
+        assert data["message"] == "Parsing task triggered"
+        assert data["template_id"] == tpl_id

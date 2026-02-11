@@ -471,7 +471,20 @@ const openDialog = (template = null) => {
 
 const submitForm = async () => {
   if (!form.value.name) { showMessage('请输入模板名称', 'warning'); return }
-  syncVisualToJson()
+  
+  // 关键修复：仅在可视化模式下同步，避免源码模式下的修改被静默覆盖
+  if (configMode.value === 'visual') {
+    syncVisualToJson()
+  } else {
+    // 源码模式下需简单校验合法性
+    try {
+      JSON.parse(form.value.rules)
+    } catch (e) {
+      showMessage('JSON 规则语法错误，请检查', 'error')
+      return
+    }
+  }
+
   saving.value = true
   try {
     const payload = { ...form.value }

@@ -11,6 +11,7 @@ class ServiceStatus(Enum):
     DUPLICATE_NAME = "DUPLICATE_NAME"
     RESOURCE_IN_USE = "RESOURCE_IN_USE"
     VERSION_ACTIVE = "VERSION_ACTIVE"
+    BAD_REQUEST = "BAD_REQUEST"
 
 class ServiceResult(Generic[T]):
     def __init__(self, status: ServiceStatus, data: Optional[T] = None, message: Optional[str] = None, business_code: Optional[str] = None):
