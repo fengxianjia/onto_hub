@@ -82,3 +82,22 @@ class TestWebhookAPI:
         )
         assert up_resp.status_code == 200
         assert up_resp.json()["name"] == new_name
+
+    def test_get_subscriptions(self, client):
+        """Test getting ontology subscription status."""
+        # This will use the actual service which might hit DB
+        response = client.get("/api/webhooks/subscriptions/by-code/eco")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+
+    def test_get_deliveries(self, client):
+        """Test getting ontology delivery history."""
+        # Use a non-existent ID or mock if needed, but here we just check route exists
+        response = client.get("/api/webhooks/deliveries/invalid-id")
+        # Depending on implementation, might return 404 if ID not found in HandleResult
+        assert response.status_code in [200, 404]
+
+    def test_manual_push(self, client):
+        """Test manual trigger push endpoint."""
+        response = client.post("/api/webhooks/push/invalid-id?webhook_id=any")
+        assert response.status_code == 404  # Expected for invalid ontology ID

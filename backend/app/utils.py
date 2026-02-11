@@ -73,10 +73,14 @@ async def send_webhook_request(
     if not target_url.startswith(("http://", "https://")):
         error_message = f"Invalid URL protocol: {target_url}"
         logger.error(error_message)
-        # 记录失败日志并返回
+        # 记录失败日志并返回标准错误结构
         if save_log:
             await _save_delivery_log(webhook_id, event_type, ontology_name, payload, "FAILURE", None, error_message, db=db)
-        return
+        return {
+            "status": "FAILURE",
+            "response_status": None,
+            "error_message": error_message
+        }
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
         # 2. 执行发送 (带异步重试逻辑)

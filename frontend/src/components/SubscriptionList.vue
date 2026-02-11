@@ -175,7 +175,7 @@ const fetchSubscriptions = async (isRefresh = false) => {
     } else {
       loading.value = true
     }
-    const res = await axios.get(`/api/ontologies/by-code/${props.ontologyCode}/subscriptions`)
+    const res = await axios.get(`/api/webhooks/subscriptions/by-code/${props.ontologyCode}`)
     subscriptions.value = res.data
   } catch (e) {
     console.error('获取订阅列表失败:', e)
@@ -271,7 +271,7 @@ const manualPush = async (sub) => {
       }
 
       // 使用新的手动推送接口, 同步等待结果
-      const pushRes = await axios.post(`/api/ontologies/${targetPackageId}/push`, null, {
+      const pushRes = await axios.post(`/api/webhooks/push/${targetPackageId}`, null, {
         params: { webhook_id: webhookId }
       })
       

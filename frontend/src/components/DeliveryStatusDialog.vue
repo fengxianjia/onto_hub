@@ -120,7 +120,7 @@ const fetchDeliveries = async () => {
   if (!props.packageId) return
   
   try {
-    const res = await axios.get(`/api/ontologies/${props.packageId}/deliveries`)
+    const res = await axios.get(`/api/webhooks/deliveries/${props.packageId}`)
     deliveries.value = res.data
     
     if (isPolling.value) {

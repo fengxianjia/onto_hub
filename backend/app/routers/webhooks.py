@@ -88,8 +88,10 @@ async def ping_webhook(
     result = await service.ping_webhook(id)
     return handle_result(result)
 
+from ..core.results import ServiceResult
+
 @router.post(
-    "/api/ontologies/{id}/push",
+    "/push/{id}",
     summary="手动触发 Webhook 推送",
     tags=["Webhooks"]
 )
@@ -101,6 +103,9 @@ async def push_ontology_to_webhook(
     webhook_service: WebhookService = Depends(get_webhook_service)
 ):
     package = service.onto_repo.get_package(id)
+    if not package:
+        return handle_result(ServiceResult.not_found("本体包不存在"))
+        
     zip_path = service.get_source_zip_path(package.id)
     push_result = await webhook_service.trigger_subscription(package, webhook_id, background_tasks, zip_path, sync=True)
     result_data = handle_result(push_result)
@@ -114,7 +119,7 @@ async def push_ontology_to_webhook(
     }
 
 @router.get(
-    "/api/ontologies/by-code/{code}/subscriptions",
+    "/subscriptions/by-code/{code}",
     summary="获取本体订阅详情",
     tags=["Webhooks"]
 )
@@ -125,7 +130,7 @@ def get_ontology_subscriptions(
     return service.get_subscription_status(name=None, code=code)
 
 @router.get(
-    "/api/ontologies/{id}/deliveries",
+    "/deliveries/{id}",
     summary="查询本体交付历史",
     tags=["Webhooks"]
 )

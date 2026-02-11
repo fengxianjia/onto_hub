@@ -187,12 +187,13 @@ class WebhookService:
         # 构造激活事件 payload
         payload = {
             "event": "ontology.activated",
+            "id": package.id,
             "package_id": package.id,
-            "code": package.series_code,
-            "name": package.series.name,
+            "code": getattr(package, 'series_code', None) or getattr(package, 'code', None),
+            "name": getattr(package.series, 'name', None) if hasattr(package, 'series') and package.series else getattr(package, 'name', 'Unknown'),
             "version": package.version,
             "is_active": package.is_active,
-            "timestamp": utils.time.time() # Or datetime.utcnow()
+            "timestamp": utils.time.time()
         }
         
         # 复用 broadcast 的 task 逻辑
