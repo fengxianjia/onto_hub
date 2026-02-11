@@ -491,9 +491,6 @@ class OntologyService:
         logger.info(f"Ontology series '{code}' and its {len(packages)} versions have been deleted.")
         return ServiceResult.success_result()
 
-    def delete_ontology(self, package_id: str):
-        # Backward compatibility alias
-        return self.delete_version(package_id)
 
     def get_source_zip_path(self, package_id: str) -> str:
         # This belongs more to a StorageService but we'll put it here for now

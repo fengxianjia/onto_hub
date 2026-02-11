@@ -278,9 +278,7 @@ def list_webhooks(
 ):
     return service.get_webhooks(skip, limit)
 
-# Include Template Router
-from .routers import templates
-app.include_router(templates.router)
+# Include Template Router (Removed redundant registration)
 
 @app.delete(
     "/api/webhooks/{id}", 
