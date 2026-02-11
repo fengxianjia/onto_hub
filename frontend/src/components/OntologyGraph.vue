@@ -162,6 +162,7 @@ const staticCategories = ref([]) // 关键：持久化分类列表，不受过�
 const selectedNode = ref(null)
 const hoveredNode = ref(null)
 const isFullscreen = ref(false)
+const containerWidth = ref(1200) // 响应式容器宽度
 const activeFilters = ref([])
 const layoutMode = ref('force') // 'force' or 'grid'
 
@@ -205,6 +206,24 @@ const filteredData = computed(() => {
   const filteredLinks = rawData.value.links.filter(l => nodeIds.has(l.source_id) && nodeIds.has(l.target_id))
   
   return { nodes: filteredNodes, links: filteredLinks }
+})
+
+// 自适应动态半径：根据当前显示的节点数量动态扩充或收缩约束范围
+const dynamicMaxDistance = computed(() => {
+  const nodeCount = filteredData.value.nodes.length
+  // 核心修复：使用响应式的 containerWidth 替代 DOM 直读，确保全屏时触发重新计算
+  const viewFactor = containerWidth.value / 1200
+  
+  // 基础半径随屏幕缩放，确保大屏幕下有更多探索空间
+  const base = 300 * viewFactor
+  const targetRadius = base + (nodeCount * 6 * viewFactor)
+  
+  // 最小 300px (手机/小屏保护)，最大 1500px (超宽屏保护)
+  const finalRadius = Math.min(Math.max(targetRadius, 300), 1500)
+  
+  console.log(`[Graph] Adaptive Radius: ${finalRadius.toFixed(0)}px (Nodes: ${nodeCount}, Factor: ${viewFactor.toFixed(2)}, Width: ${containerWidth.value}px)`)
+  
+  return finalRadius
 })
 
 // Methods
@@ -318,12 +337,21 @@ const initGraph = () => {
     .height(height)
     .backgroundColor('#ffffff')
     .nodeRelSize(7)
-    .width(width)
-    .height(height)
-    .backgroundColor('#ffffff')
     .nodeRelSize(7)
     .d3AlphaDecay(0.01)
     .d3VelocityDecay(0.3)
+    .onEngineTick(() => {
+      // 物理拦截：基于自适应动态半径强制收束
+      const maxDistance = dynamicMaxDistance.value;
+      rawData.value.nodes.forEach(node => {
+        const dist = Math.sqrt(node.x * node.x + node.y * node.y);
+        if (dist > maxDistance) {
+          const ratio = maxDistance / dist;
+          node.x *= ratio;
+          node.y *= ratio;
+        }
+      });
+    })
     .nodeId('id')
     .nodeLabel(node => `<div class="p-2 bg-white/90 border rounded-lg shadow-xl font-sans">
         <b class="text-accent">${node.name}</b><br/>
@@ -420,6 +448,17 @@ const formatValue = (val) => {
 // Lifecycle
 onMounted(() => {
   fetchGraph()
+  
+  // 监听容器尺寸变化，驱动半径自适应
+  if (graphContainer.value) {
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        containerWidth.value = entry.contentRect.width
+      }
+    })
+    observer.observe(graphContainer.value)
+    onUnmounted(() => observer.disconnect())
+  }
   window.addEventListener('resize', handleResize)
   document.addEventListener('fullscreenchange', handleFullscreenChange)
 })

@@ -239,14 +239,73 @@
               <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
               实体属性提取 (Attribute Extraction)
             </h4>
-            <!-- Regex / Table Patterns (Existing Logic) -->
+            <!-- Regex Patterns -->
             <div class="space-y-4">
-               <!-- ... 保持现有 Regex 配置逻辑 ... -->
                 <div class="flex justify-between items-center bg-white/60 p-2 rounded-lg border border-border/40">
-                  <h5 class="font-semibold text-sm">正则规则</h5>
-                  <Button variant="ghost" size="xs" @click="addRegexPattern" class="text-accent">+ 添加</Button>
+                  <h5 class="font-semibold text-sm">正则规则 (Regex)</h5>
+                  <Button variant="ghost" size="xs" @click="addRegexPattern" class="text-accent">+ 添加规则</Button>
                 </div>
-                <!-- ... 省略重复内容以便聚焦改动 ... -->
+                <div v-if="visualRules.attribute.regex_patterns.length === 0" class="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                  暂无正则规则，点击上方添加
+                </div>
+                <div v-for="(p, idx) in visualRules.attribute.regex_patterns" :key="idx" class="grid grid-cols-12 gap-3 items-end bg-background p-3 rounded-lg border shadow-inner">
+                  <div class="col-span-4">
+                    <Input v-model="p.key" label="目标字段名" placeholder="e.g. version" />
+                  </div>
+                  <div class="col-span-6">
+                    <Input v-model="p.pattern" label="正则匹配式" placeholder="e.g. 版本：(.*)" />
+                  </div>
+                  <div class="col-span-2 pb-1 text-right">
+                    <Button variant="ghost" size="sm" class="text-red-500" @click="removeRegexPattern(idx)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </Button>
+                  </div>
+                </div>
+            </div>
+
+            <!-- Table Strategies -->
+            <div class="space-y-4 pt-4 border-t border-indigo-100">
+                <div class="flex justify-between items-center bg-white/60 p-2 rounded-lg border border-border/40">
+                  <h5 class="font-semibold text-sm">表格解析策略 (Table)</h5>
+                  <Button variant="ghost" size="xs" @click="addTableStrategy" class="text-accent">+ 添加策略</Button>
+                </div>
+                <div v-if="visualRules.attribute.strategies.length === 0" class="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                  暂无表格解析策略
+                </div>
+                <div v-for="(strat, sIdx) in visualRules.attribute.strategies" :key="sIdx" class="space-y-4 p-4 bg-indigo-50/20 rounded-xl border border-indigo-100 shadow-sm">
+                   <div class="flex justify-between items-center border-b border-indigo-100 pb-2">
+                      <div class="flex gap-4">
+                         <Select 
+                            v-model="strat.type" 
+                            label="表格类型"
+                            size="sm"
+                            :options="[
+                              { label: '按行映射 (table_row)', value: 'table_row' },
+                              { label: '按列映射 (table_column)', value: 'table_column' }
+                            ]"
+                         />
+                         <Input v-model="strat.target_key" label="存储目标 (如 properties)" size="sm" />
+                      </div>
+                      <Button variant="ghost" size="xs" class="text-red-500" @click="removeTableStrategy(sIdx)">删除策略</Button>
+                   </div>
+                   
+                   <!-- Header Mapping Sub-section -->
+                   <div class="space-y-2">
+                      <div class="flex justify-between items-center text-xs font-bold text-indigo-700">
+                        <span>列名映射 (Header Mapping)</span>
+                        <button class="hover:text-accent transition-colors" @click="addHeaderMap(strat)">+ 添加映射</button>
+                      </div>
+                      <div v-for="(m, mIdx) in strat.header_maps" :key="mIdx" class="flex gap-2 items-center group">
+                        <Input v-model="m.from" placeholder="表格原标题" size="xs" class="flex-1" />
+                        <span class="text-muted-foreground text-xs">&rarr;</span>
+                        <Input v-model="m.to" placeholder="映射属性名" size="xs" class="flex-1" />
+                        <button class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-500 transition-all" @click="removeHeaderMap(strat, mIdx)">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                      <p v-if="strat.header_maps.length === 0" class="text-[10px] text-muted-foreground italic">未配置列映射将尝试原样录入。</p>
+                   </div>
+                </div>
             </div>
           </div>
         </div>
