@@ -6,8 +6,8 @@
     <!-- Main Content -->
     <main class="py-6 animate-slideUp">
       <Container max-width="full">
-        <!-- Tabs -->
-        <div class="mb-8 flex gap-4 border-b-2 border-border">
+        <!-- Tabs (仅在非集成环境下显示) -->
+        <div v-if="!isMicroApp" class="mb-8 flex gap-4 border-b-2 border-border">
           <button
             v-for="tab in tabs"
             :key="tab.value"
@@ -125,8 +125,22 @@ const tabs = [
   { label: '订阅设置', value: 'webhook' },
   { label: '解析模板', value: 'templates' }
 ]
-const activeTab = ref('ontology')
+// Micro-App 环境判断
+const isMicroApp = window.__MICRO_APP_ENVIRONMENT__
+
+// 尝试获取初始化数据（修复首次加载时的 activeTab）
+const initData = isMicroApp ? window.microApp?.getData() : {}
+const activeTab = ref(initData?.activeTab || 'ontology')
 const ontologyManagerRef = ref(null)
+
+// 深度集成：监听主应用发送的 Data 信号
+if (isMicroApp) {
+  window.microApp?.addDataListener((data) => {
+    if (data.activeTab) {
+      activeTab.value = data.activeTab
+    }
+  })
+}
 
 // Dialog states
 const uploadDialogVisible = ref(false)

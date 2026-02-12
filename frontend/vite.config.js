@@ -6,7 +6,9 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vitejs.dev/config/
-export default defineConfig({
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/onto_hub/' : '/',
   plugins: [vue()],
   resolve: {
     alias: {
@@ -14,6 +16,10 @@ export default defineConfig({
     }
   },
   server: {
+    host: '127.0.0.1',
+    port: 5174,
+    strictPort: true,
+    cors: true,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8003',
@@ -21,4 +27,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))
