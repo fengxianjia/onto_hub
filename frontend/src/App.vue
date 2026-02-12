@@ -4,10 +4,10 @@
     <Header title="OntoHub" subtitle="本体管理中心" />
     
     <!-- Main Content -->
-    <main class="py-12 animate-slideUp">
+    <main class="py-6 animate-slideUp">
       <Container max-width="full">
         <!-- Tabs -->
-        <div class="mb-12 flex gap-6 border-b-2 border-border">
+        <div class="mb-8 flex gap-4 border-b-2 border-border">
           <button
             v-for="tab in tabs"
             :key="tab.value"
@@ -159,7 +159,7 @@ const deleteOntologyDialog = reactive({
 
 // Methods
 const tabClasses = (value) => {
-  const base = 'px-8 py-4 text-base font-bold transition-all duration-300 border-b-4 cursor-pointer'
+  const base = 'px-6 py-2 text-sm font-bold transition-all duration-300 border-b-4 cursor-pointer'
   return value === activeTab.value
     ? `${base} border-accent text-accent scale-105`
     : `${base} border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30`

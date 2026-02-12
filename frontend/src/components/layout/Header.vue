@@ -1,14 +1,14 @@
 <template>
   <header class="sticky top-0 z-40 w-full border-b-2 border-border bg-card/90 backdrop-blur-md shadow-lg">
     <Container max-width="full">
-      <div class="flex h-20 items-center justify-between">
-        <div class="flex items-center gap-4">
-          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-secondary text-2xl shadow-lg">
+      <div class="flex h-14 items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-secondary text-xl shadow-md">
             📦
           </div>
           <div>
-            <h1 class="text-2xl font-bold text-foreground">{{ title }}</h1>
-            <p v-if="subtitle" class="text-sm text-muted-foreground">{{ subtitle }}</p>
+            <h1 class="text-lg font-bold text-foreground">{{ title }}</h1>
+            <p v-if="subtitle" class="text-xs text-muted-foreground">{{ subtitle }}</p>
           </div>
         </div>
         <div class="flex items-center gap-4">

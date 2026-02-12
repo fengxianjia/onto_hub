@@ -24,8 +24,8 @@ export default {
                 mono: ['JetBrains Mono', 'monospace'],
             },
             fontSize: {
-                'hero': ['5.25rem', { lineHeight: '1.05', letterSpacing: '-0.02em' }],
-                'section': ['3.25rem', { lineHeight: '1.15' }],
+                'hero': ['4rem', { lineHeight: '1', letterSpacing: '-0.02em' }],
+                'section': ['2.5rem', { lineHeight: '1.1' }],
             },
             boxShadow: {
                 'accent': '0 4px 14px rgba(0, 82, 255, 0.25)',
