@@ -183,7 +183,7 @@ class OntologyService:
             if series:
                 final_name = series.name
             else:
-                final_name = file.filename
+                final_name = code
 
         # If template_id provided, use it (and update default if user wants? For now, let's say uploading a version with template sets default if series is new)
         final_template_id = template_id

@@ -11,7 +11,7 @@
         <Input
           v-model="form.name"
           label="显示名称"
-          placeholder="人类可读名称 (e.g. 认证模块)"
+          placeholder="本体名称 (选填，不填默认使用本体编码)"
         />
         <Select
           v-model="form.templateId"
