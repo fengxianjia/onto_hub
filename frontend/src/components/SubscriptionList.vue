@@ -41,16 +41,16 @@
           <!-- Service Info -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-2">
-              <h4 class="font-medium truncate">{{ sub.webhook_name || '未命名服务' }}</h4>
+              <h4 class="font-medium text-sm truncate">{{ sub.webhook_name || '未命名服务' }}</h4>
               <Badge v-if="sub.is_global" variant="info" size="sm">全局订阅</Badge>
             </div>
             
-            <p class="text-sm text-muted-foreground truncate mb-3" :title="sub.target_url">
+            <p class="text-xs text-muted-foreground truncate mb-3" :title="sub.target_url">
               {{ sub.target_url }}
             </p>
 
             <!-- Version Info -->
-            <div class="flex items-center gap-4 text-sm">
+            <div class="flex items-center gap-4 text-xs">
               <div v-if="sub.latest_success_version">
                 <span class="text-muted-foreground">当前版本:</span>
                 <Badge variant="accent" size="sm" class="ml-2">

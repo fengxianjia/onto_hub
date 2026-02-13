@@ -1,29 +1,44 @@
 /* 设计令牌 - CSS 自定义属性 */
 :root {
-    /* 颜色 */
-    --background: #FAFAFA;
-    --foreground: #0F172A;
-    --muted: #F1F5F9;
-    --muted-foreground: #64748B;
-    --accent: #0052FF;
-    --accent-secondary: #4D7CFF;
+    /* 颜色 - 匹配 Host (onto-agent) */
+    --background: #FFFFFF;
+    /* Host panel-2 is white */
+    --foreground: #111827;
+    /* Host --text */
+    --muted: #f3f4f6;
+    /* Host --panel */
+    --muted-foreground: #6b7280;
+    /* Host --muted */
+    --accent: #0a59f7;
+    /* Host --accent */
+    --accent-secondary: #5c8ef8;
+    /* Host --accent-2 */
     --accent-foreground: #FFFFFF;
-    --border: #E2E8F0;
+    --border: #e5e7eb;
+    /* Host --border */
     --card: #FFFFFF;
-    --ring: #0052FF;
+    --ring: #0a59f7;
 
-    /* 字体 */
-    --font-sans: 'Inter', system-ui, sans-serif;
-    --font-display: 'Calistoga', Georgia, serif;
+    /* 字体 - 匹配 Host */
+    --font-sans: 'Inter Tight', 'IBM Plex Sans', 'Source Sans 3', system-ui, -apple-system, sans-serif;
+    --font-display: 'Inter Tight', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    /* 阴影 */
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08);
+    /* 圆角 - 匹配 Host (12px) */
+    --radius: 0.75rem;
+
+    /* 阴影 - 匹配 Host */
+    --shadow-sm: 0 4px 12px rgba(16, 24, 40, 0.06);
+    /* Host --shadow-topbar */
+    --shadow-md: 0 6px 18px rgba(16, 24, 40, 0.08);
+    /* Host --shadow-card */
+    --shadow-lg: 0 10px 24px rgba(16, 24, 40, 0.12);
+    /* Host --shadow-hover */
     --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1);
-    --shadow-accent: 0 4px 14px rgba(0, 82, 255, 0.25);
-    --shadow-accent-lg: 0 8px 24px rgba(0, 82, 255, 0.35);
+    --shadow-accent: 0 6px 14px rgba(10, 89, 247, 0.25);
+    /* Host --shadow-button */
+    --shadow-accent-lg: 0 8px 18px rgba(10, 89, 247, 0.32);
+    /* Host --shadow-button-hover */
 }
 
 /* 全局样式重置 */
@@ -34,8 +49,8 @@
 }
 
 html {
-    font-size: 14px;
-    /* 从 16px 缩小到 14px */
+    font-size: 16px;
+    /* 必须设为 16px 以防止污染主应用 html 字号，导致 rem 计算变小 */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -45,8 +60,10 @@ body {
     font-family: var(--font-sans);
     background-color: var(--background);
     color: var(--foreground);
-    line-height: 1.4;
-    /* 从 1.5 缩小到 1.4 */
+    font-size: 14px;
+    /* 内部内容回退到 14px，保持精致感 */
+    line-height: 1.5;
+    /* 统一为 1.5 */
     min-height: 100vh;
 }
 

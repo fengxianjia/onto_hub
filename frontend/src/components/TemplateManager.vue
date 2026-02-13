@@ -4,7 +4,7 @@
     <Card variant="flat" class="mb-0 overflow-visible">
       <div class="flex justify-between items-center py-2 px-1">
         <div class="flex items-center gap-3">
-          <h2 class="text-2xl font-bold text-foreground">解析模板管理</h2>
+          <h2 class="text-lg font-bold text-foreground">解析模板管理</h2>
           <Button variant="ghost" size="sm" @click="showGuide = !showGuide" :class="['transition-colors p-1', showGuide ? 'text-accent bg-accent/10 shadow-inner' : 'text-muted-foreground hover:text-foreground']" title="配置指南">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -30,11 +30,11 @@
     <!-- Usage Guide -->
     <Card v-if="showGuide" variant="flat" class="bg-muted/30 border-dashed border-2 animate-in fade-in slide-in-from-top-2">
       <div class="space-y-3">
-        <h3 class="font-bold flex items-center gap-2 text-foreground text-base">
+        <h3 class="font-bold flex items-center gap-2 text-foreground text-sm">
           配置指南
         </h3>
-        <p class="text-sm text-muted-foreground leading-relaxed">解析模板定义了系统如何从本体文件中提取知识。系统支持 <b>Markdown (单文档单实体)</b> 与 <b>OWL/RDF (复合本体多实体)</b> 两种模式。</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm mt-4">
+        <p class="text-xs text-muted-foreground leading-relaxed">解析模板定义了系统如何从本体文件中提取知识。系统支持 <b>Markdown (单文档单实体)</b> 与 <b>OWL/RDF (复合本体多实体)</b> 两种模式。</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs mt-4">
           <div>
             <h4 class="font-semibold mb-3 text-foreground border-l-4 border-accent pl-2">1. 实体识别 (Entity)</h4>
             <ul class="list-disc list-inside space-y-2 text-muted-foreground">
@@ -72,7 +72,7 @@
             <div class="mt-8 p-6 rounded-2xl bg-white/50 border border-border shadow-sm">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-start gap-8">
                   <div>
-                    <h4 class="font-bold text-sm text-foreground flex items-center gap-2">
+                    <h4 class="font-bold text-xs text-foreground flex items-center gap-2">
                        <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0L8 8m4-4v12"></path></svg>
                        示例配置参考
                     </h4>
@@ -107,18 +107,24 @@
           <table class="w-full">
             <thead class="bg-muted/50">
               <tr>
-                <th class="px-6 py-3 text-left text-sm font-bold text-foreground">名称</th>
+                <th class="px-6 py-3 text-left text-sm font-bold text-foreground w-48">名称</th>
                 <th class="px-6 py-3 text-left text-sm font-bold text-foreground">描述</th>
-                <th class="px-6 py-3 text-left text-sm font-bold text-foreground">规则概览</th>
-                <th class="px-6 py-3 text-left text-sm font-bold text-foreground">操作</th>
+                <th class="px-6 py-3 text-left text-sm font-bold text-foreground w-32">类型</th>
+                <th class="px-6 py-3 text-left text-sm font-bold text-foreground w-40">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-border">
               <tr v-for="t in templates" :key="t.id" class="hover:bg-muted/20 transition-colors">
-                <td class="px-6 py-4 font-medium">{{ t.name }}</td>
-                <td class="px-6 py-4 text-muted-foreground">{{ t.description || '-' }}</td>
+                <td class="px-6 py-4 font-medium text-sm">{{ t.name }}</td>
+                <td class="px-6 py-4 text-muted-foreground text-xs max-w-sm truncate" :title="t.description">{{ t.description || '-' }}</td>
                 <td class="px-6 py-4">
-                  <Badge variant="info" size="sm">JSON Rules</Badge>
+                  <Badge 
+                    :variant="t.parser_type === 'owl' ? 'warning' : (t.parser_type === 'custom' ? 'default' : 'accent')" 
+                    size="sm" 
+                    outline
+                  >
+                    {{ t.parser_type === 'owl' ? 'OWL/RDF' : (t.parser_type === 'custom' ? 'Custom' : 'Markdown') }}
+                  </Badge>
                 </td>
                 <td class="px-6 py-4">
                   <div class="flex gap-2">

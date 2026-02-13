@@ -21,6 +21,11 @@ export default defineConfig(({ mode }) => ({
     strictPort: true,
     cors: true,
     proxy: {
+      '/onto_hub/api': {
+        target: 'http://127.0.0.1:8003',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/onto_hub\/api/, '/api')
+      },
       '/api': {
         target: 'http://127.0.0.1:8003',
         changeOrigin: true,

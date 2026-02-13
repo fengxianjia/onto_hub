@@ -3,7 +3,7 @@
     <!-- Header -->
     <Card variant="flat" class="mb-0 overflow-visible">
       <div class="flex justify-between items-center py-2 px-1">
-        <h3 class="text-2xl font-bold text-foreground">订阅管理 (Webhooks)</h3>
+        <h3 class="text-lg font-bold text-foreground">订阅管理 (Webhooks)</h3>
         <div class="flex gap-3">
           <Button variant="ghost" size="sm" @click="fetchWebhooks" title="刷新">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -37,21 +37,21 @@
         <table class="w-full">
           <thead class="bg-gradient-to-r from-muted/80 to-muted/40">
             <tr>
-              <th class="px-6 py-3 text-left text-sm font-semibold text-foreground whitespace-nowrap">名称</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold text-foreground whitespace-nowrap">回调地址</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold text-foreground whitespace-nowrap">事件类型</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold text-foreground whitespace-nowrap">适用本体</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold text-foreground whitespace-nowrap">签名加固</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold text-foreground whitespace-nowrap">连通性</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold text-foreground whitespace-nowrap">创建时间</th>
-              <th class="px-6 py-3 text-right text-sm font-semibold text-foreground whitespace-nowrap">操作</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground whitespace-nowrap">名称</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground whitespace-nowrap">回调地址</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground whitespace-nowrap">事件类型</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground whitespace-nowrap">适用本体</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground whitespace-nowrap">签名加固</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground whitespace-nowrap">连通性</th>
+              <th class="px-6 py-3 text-left text-sm font-bold text-foreground whitespace-nowrap">创建时间</th>
+              <th class="px-6 py-3 text-right text-sm font-bold text-foreground whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
             <tr v-for="(row, index) in tableData" :key="row.id" 
                 :class="['transition-all duration-200 hover:bg-accent/5 hover:shadow-md', index % 2 === 0 ? 'bg-white' : 'bg-muted/20']">
               <td class="px-6 py-4 text-sm font-medium whitespace-nowrap">{{ row.name }}</td>
-              <td class="px-6 py-4 text-sm text-muted-foreground max-w-xs truncate" :title="row.target_url">{{ row.target_url }}</td>
+              <td class="px-6 py-4 text-xs text-muted-foreground max-w-xs truncate" :title="row.target_url">{{ row.target_url }}</td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <Badge variant="accent" size="sm">{{ row.event_type }}</Badge>
               </td>
@@ -74,7 +74,7 @@
                     <span v-else class="text-xs text-muted-foreground">-</span>
                  </div>
               </td>
-              <td class="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">{{ formatDate(row.created_at) }}</td>
+              <td class="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">{{ formatDate(row.created_at) }}</td>
               <td class="px-6 py-4 text-right whitespace-nowrap">
                 <div class="flex justify-end gap-1">
                   <button title="测试连通性" @click="handlePing(row)" class="p-1.5 rounded-lg text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors">

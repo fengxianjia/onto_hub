@@ -3,7 +3,7 @@
     <!-- Header Area -->
     <Card variant="flat" class="mb-0 overflow-visible">
       <div class="flex justify-between items-center py-2 px-1">
-        <h3 class="text-2xl font-bold text-foreground">本体列表</h3>
+        <h3 class="text-lg font-bold text-foreground">本体列表</h3>
         <div class="flex gap-3">
           <Button variant="ghost" size="sm" @click="fetchOntologies" title="刷新">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -34,28 +34,28 @@
         <table class="w-full">
           <thead class="bg-gradient-to-r from-muted/80 to-muted/40">
             <tr>
-              <th class="px-8 py-4 text-left text-base font-bold text-foreground">编码</th>
-              <th class="px-8 py-4 text-left text-base font-bold text-foreground">名称</th>
-              <th class="px-8 py-4 text-left text-base font-bold text-foreground">版本</th>
-              <th class="px-8 py-4 text-left text-base font-bold text-foreground">解析模板</th>
-              <th class="px-8 py-4 text-left text-base font-bold text-foreground">上传时间</th>
-              <th class="px-8 py-4 text-left text-base font-bold text-foreground">操作</th>
+              <th class="px-8 py-4 text-left text-sm font-bold text-foreground">编码</th>
+              <th class="px-8 py-4 text-left text-sm font-bold text-foreground">名称</th>
+              <th class="px-8 py-4 text-left text-sm font-bold text-foreground">版本</th>
+              <th class="px-8 py-4 text-left text-sm font-bold text-foreground">解析模板</th>
+              <th class="px-8 py-4 text-left text-sm font-bold text-foreground">上传时间</th>
+              <th class="px-8 py-4 text-left text-sm font-bold text-foreground">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
             <tr v-for="(row, index) in tableData" :key="row.id" 
                 :class="['transition-all duration-200 hover:bg-accent/5 hover:shadow-md', index % 2 === 0 ? 'bg-white' : 'bg-muted/20']">
               <td class="px-8 py-5">
-                <Badge variant="info" outline size="lg">{{ row.code || '-' }}</Badge>
+                <Badge variant="info" outline size="md">{{ row.code || '-' }}</Badge>
               </td>
-              <td class="px-8 py-5 text-base font-medium">{{ row.name }}</td>
+              <td class="px-8 py-5 text-sm font-medium">{{ row.name }}</td>
               <td class="px-8 py-5">
-                <Badge variant="accent" size="lg">v{{ row.version }}</Badge>
+                <Badge variant="accent" size="md">v{{ row.version }}</Badge>
               </td>
               <td class="px-8 py-5">
-                <span class="text-sm text-muted-foreground">{{ row.template_name || '-' }}</span>
+                <span class="text-xs text-muted-foreground">{{ row.template_name || '-' }}</span>
               </td>
-              <td class="px-8 py-5 text-sm text-muted-foreground">{{ formatDate(row.upload_time) }}</td>
+              <td class="px-8 py-5 text-xs text-muted-foreground">{{ formatDate(row.upload_time) }}</td>
               <td class="px-8 py-5">
                 <div class="flex gap-3">
                   <Button variant="ghost" size="sm" @click="$emit('view', row)">详情</Button>
