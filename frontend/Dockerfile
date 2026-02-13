@@ -24,6 +24,9 @@ COPY --from=build-stage /app/dist /usr/share/nginx/html
 # Copy custom Nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Create symlink for /onto_hub path compatibility
+RUN ln -s /usr/share/nginx/html /usr/share/nginx/html/onto_hub
+
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
