@@ -141,7 +141,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
-import axios from 'axios'
+import { getOntologyGraph } from '../api/ontologies.js'
 import ForceGraph from 'force-graph'
 import { Loading, Empty, Badge, Button } from './index.js'
 
@@ -230,7 +230,7 @@ const dynamicMaxDistance = computed(() => {
 const fetchGraph = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`/api/ontologies/${props.ontologyId}/graph`)
+    const res = await getOntologyGraph(props.ontologyId)
     rawData.value = res.data
     
     // 初始化静态分类列表 (全量点中提取并冻结)
@@ -283,15 +283,18 @@ const applyLayout = () => {
   if (!graphInstance.value) return
   
   if (layoutMode.value === 'grid') {
-    // 算法：按分类和名称进行行列排序
-    const nodes = filteredData.value.nodes
-    const numNodes = nodes.length
-    const cols = Math.ceil(Math.sqrt(numNodes * 1.5))
-    const spacing = 120
+    // 算法：使用叶序 (Phyllotaxis) 螺旋排列实现圆形布局
+    // 先按分类排序，确保存颜色聚集
+    const nodes = [...filteredData.value.nodes].sort((a, b) => (a.category || '').localeCompare(b.category || ''))
+    const spacing = 45 // 节点间距
+    const angle = 2.39996 // 黄金角 (约137.5度)
     
     nodes.forEach((node, i) => {
-      node.fx = (i % cols) * spacing - (cols * spacing) / 2
-      node.fy = Math.floor(i / cols) * spacing - (Math.sqrt(numNodes) * spacing) / 2
+      const r = spacing * Math.sqrt(i + 1) // 半径随索引递增
+      const theta = i * angle
+      
+      node.fx = r * Math.cos(theta)
+      node.fy = r * Math.sin(theta)
     })
     
     // 停止物理模拟

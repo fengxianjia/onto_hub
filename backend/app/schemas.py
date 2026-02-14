@@ -67,6 +67,11 @@ class WebhookBase(BaseModel):
 class WebhookCreate(WebhookBase):
     pass
 
+class WebhookTest(BaseModel):
+    webhook_id: Optional[str] = Field(None, description="如果提供，将使用该 Webhook 的配置进行测试 (忽略 URL 和 Secret)")
+    target_url: Optional[str] = Field(None, description="目标 URL (如果不提供 ID 则必填)")
+    secret_token: Optional[str] = Field(None, description="签名密钥")
+
 class WebhookResponse(WebhookBase):
     id: str
     created_at: datetime

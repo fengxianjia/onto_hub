@@ -38,7 +38,8 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import axios from 'axios'
+
+import { getOntologyEntities } from '../api/ontologies.js'
 import { Input, Loading, Empty, Badge } from './index.js'
 
 const props = defineProps({
@@ -55,7 +56,7 @@ const searchQuery = ref('')
 const fetchEntities = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`/api/ontologies/${props.ontologyId}/entities`)
+    const res = await getOntologyEntities(props.ontologyId)
     entities.value = res.data
   } catch (e) {
     console.error(e)

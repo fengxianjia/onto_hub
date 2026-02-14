@@ -87,7 +87,8 @@
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
-import axios from 'axios'
+import { getTemplates } from '../api/templates.js'
+import { updateOntologySeries, reparseOntology } from '../api/ontologies.js'
 import { Badge, Button, Select as UISelect, Input as UIInput } from './index.js'
 import { message, showConfirm } from '../utils/message.js'
 
@@ -115,7 +116,7 @@ const reparseForm = reactive({
 
 const fetchTemplates = async () => {
   try {
-    const res = await axios.get('/api/templates/')
+    const res = await getTemplates()
     templateOptions.value = [
       { label: '不解析 (None)', value: '' },
       ...res.data.map(t => ({ label: t.name, value: t.id }))
@@ -128,7 +129,7 @@ const fetchTemplates = async () => {
 const handleUpdateSeries = async () => {
   updatingSeries.value = true
   try {
-    await axios.patch(`/api/ontologies/${props.ontology.code}`, {
+    await updateOntologySeries(props.ontology.code, {
       name: editForm.name,
       default_template_id: editForm.templateId || null
     })
@@ -150,7 +151,7 @@ const handleReparse = async () => {
     )
     
     reparsing.value = true
-    await axios.post(`/api/ontologies/packages/${props.ontology.id}/reparse`, {
+    await reparseOntology(props.ontology.id, {
       template_id: reparseForm.templateId || null
     })
     message.success('已触发重新解析，后台正在处理中...')

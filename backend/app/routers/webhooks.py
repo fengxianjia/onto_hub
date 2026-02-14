@@ -37,6 +37,27 @@ def list_webhooks(
 ):
     return service.get_webhooks(skip, limit)
 
+@router.post(
+    "/test/connection",
+    summary="测试 Webhook 连通性 (支持 ID 或 URL)",
+    tags=["Webhooks"]
+)
+async def test_webhook_connectivity(
+    payload: schemas.WebhookTest,
+    service: WebhookService = Depends(get_webhook_service)
+):
+    """
+    测试连通性。
+    - 如果提供 `webhook_id`，将从数据库读取配置进行测试。
+    - 如果提供 `target_url`，将直接测试该 URL (无需保存)。
+    """
+    result = await service.test_connection(
+        target_url=payload.target_url, 
+        secret_token=payload.secret_token,
+        webhook_id=payload.webhook_id
+    )
+    return handle_result(result)
+
 @router.delete(
     "/{id}", 
     status_code=204,
@@ -76,17 +97,6 @@ def get_webhook_logs(
     service: WebhookService = Depends(get_webhook_service)
 ):
     return service.get_logs_by_webhook(id, ontology_code, status, skip, limit)
-
-@router.post(
-    "/{id}/ping",
-    summary="连通性测试 (Ping)"
-)
-async def ping_webhook(
-    id: str,
-    service: WebhookService = Depends(get_webhook_service)
-):
-    result = await service.ping_webhook(id)
-    return handle_result(result)
 
 from ..core.results import ServiceResult
 
@@ -142,3 +152,5 @@ def get_ontology_deliveries(
     pkg_result = onto_service.get_ontology_detail(id)
     package = handle_result(pkg_result)
     return webhook_service.get_ontology_delivery_status(id, package.code)
+
+

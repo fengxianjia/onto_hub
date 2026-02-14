@@ -49,7 +49,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import axios from 'axios'
+import { getFileContent } from '../api/ontologies.js'
 import MarkdownIt from 'markdown-it'
 import 'github-markdown-css/github-markdown-light.css'
 import { Badge, Empty, Loading } from './index.js'
@@ -93,9 +93,7 @@ const handleFileSelect = async (file) => {
   fileContent.value = ''
   
   try {
-    const res = await axios.get(`/api/ontologies/${props.ontologyId}/files`, {
-      params: { path: file.path }
-    })
+    const res = await getFileContent(props.ontologyId, { path: file.path })
     fileContent.value = res.data.content || '(无内容)'
   } catch (error) {
     fileContent.value = '加载失败'

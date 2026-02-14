@@ -117,7 +117,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import axios from 'axios'
+import { getOntology, activateOntology } from '../api/ontologies.js'
 import { 
   Dialog, Badge, Button, Card, Loading, 
   RelationList, FileBrowser, OntologySettings 
@@ -163,7 +163,7 @@ const fetchOntologyDetail = async () => {
   
   loading.value = true
   try {
-    const res = await axios.get(`/api/ontologies/${props.ontologyId}`)
+    const res = await getOntology(props.ontologyId)
     ontology.value = res.data
   } catch (error) {
     message.error('获取本体详情失败')
@@ -196,7 +196,7 @@ const handleActivate = async () => {
     activating.value = true
     currentPackageId.value = ontology.value.id
     
-    await axios.post(`/api/ontologies/${ontology.value.id}/activate`)
+    await activateOntology(ontology.value.id)
     message.success(`版本 v${ontology.value.version} 已激活并触发推送`)
     
     deliveryDialogVisible.value = true

@@ -144,7 +144,8 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
-import axios from 'axios'
+import { getDeliveries } from '../api/webhooks.js'
+import { activateOntology } from '../api/ontologies.js'
 import { Dialog, Badge, Button, Loading, Empty } from './index.js'
 import { showMessage } from '../utils/message.js'
 
@@ -184,7 +185,7 @@ const fetchPushStatus = async (isInitial = false) => {
       loading.value = true
     }
     // 使用后端已有的 API: /api/webhooks/deliveries/{id}
-    const res = await axios.get(`/api/webhooks/deliveries/${props.packageId}`)
+    const res = await getDeliveries(props.packageId)
     pushStatus.value = res.data
   } catch (e) {
     console.error('获取推送状态失败:', e)
@@ -223,7 +224,7 @@ const stopPolling = () => {
 const retryPush = async (webhookId) => {
   try {
     // 重新激活当前版本,会自动触发推送
-    await axios.post(`/api/ontologies/${props.packageId}/activate`)
+    await activateOntology(props.packageId)
     showMessage.success('重新推送已触发')
     fetchPushStatus()
   } catch (e) {

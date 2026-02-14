@@ -81,7 +81,7 @@
             <Button
               variant="outline"
               size="sm"
-              @click="manualPush(sub)"
+              @click="manualPushHandle(sub)"
               :disabled="pushing === sub.webhook_id"
             >
               <svg v-if="pushing === sub.webhook_id" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -130,7 +130,8 @@
 
 <script setup>
 import { ref, onMounted, watch, reactive } from 'vue'
-import axios from 'axios'
+import { getWebhookLogs, getSubscriptionsByCode, manualPush } from '../api/webhooks.js'
+import { getOntologies } from '../api/ontologies.js'
 import { Button, Badge, Loading, Empty } from './index.js'
 import { message, showConfirm } from '../utils/message.js'
 
@@ -175,7 +176,7 @@ const fetchSubscriptions = async (isRefresh = false) => {
     } else {
       loading.value = true
     }
-    const res = await axios.get(`/api/webhooks/subscriptions/by-code/${props.ontologyCode}`)
+    const res = await getSubscriptionsByCode(props.ontologyCode)
     subscriptions.value = res.data
   } catch (e) {
     console.error('获取订阅列表失败:', e)
@@ -222,9 +223,7 @@ const fetchLogs = async (webhookId, filters = {}) => {
     params.skip = (logsPagination.currentPage - 1) * logsPagination.pageSize
     params.limit = logsPagination.pageSize
 
-    const res = await axios.get(`/api/webhooks/${targetWebhookId}/logs`, {
-      params
-    })
+    const res = await getWebhookLogs(targetWebhookId, params)
     logsData.value = res.data.items
     logsPagination.total = res.data.total
   } catch (e) {
@@ -235,7 +234,7 @@ const fetchLogs = async (webhookId, filters = {}) => {
 }
 
 // 手动推送 - 使用激活接口重新激活最新版本
-const manualPush = async (sub) => {
+const manualPushHandle = async (sub) => {
   const webhookId = sub.webhook_id
   try {
     pushing.value = webhookId
@@ -244,8 +243,8 @@ const manualPush = async (sub) => {
 
     if (!targetPackageId) {
       // 如果没有传递具体包ID，则默认获取最新版本 (兼容旧逻辑)
-      const packagesRes = await axios.get(`/api/ontologies`, {
-        params: { code: props.ontologyCode, limit: 1 }
+      const packagesRes = await getOntologies({
+        code: props.ontologyCode, limit: 1
       })
       
       const packages = packagesRes.data.items || []
@@ -271,9 +270,7 @@ const manualPush = async (sub) => {
       }
 
       // 使用新的手动推送接口, 同步等待结果
-      const pushRes = await axios.post(`/api/webhooks/push/${targetPackageId}`, null, {
-        params: { webhook_id: webhookId }
-      })
+      const pushRes = await manualPush(targetPackageId, { webhook_id: webhookId })
       
       const result = pushRes.data.delivery_result
       if (result && result.status === 'SUCCESS') {
@@ -296,6 +293,8 @@ const manualPush = async (sub) => {
     pushing.value = null
   }
 }
+      
+
 
 // 查看推送历史
 const viewHistory = (webhookId, webhookName = '') => {

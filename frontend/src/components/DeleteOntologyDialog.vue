@@ -39,7 +39,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import axios from 'axios'
+import { deleteOntologySeries } from '../api/ontologies.js'
 import { Button, Input, Dialog } from './index.js'
 import { showMessage } from '../utils/message.js'
 
@@ -63,7 +63,7 @@ const confirmDelete = async () => {
   
   loading.value = true
   try {
-    await axios.delete(`/api/ontologies/by-code/${props.ontologyCode}`)
+    await deleteOntologySeries(props.ontologyCode)
     showMessage(`本体 ${props.ontologyCode} 已彻底删除`, 'success')
     emit('success')
     visible.value = false

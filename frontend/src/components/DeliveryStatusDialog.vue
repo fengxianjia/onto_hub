@@ -74,7 +74,7 @@
 
 <script setup>
 import { ref, watch, computed, onUnmounted } from 'vue'
-import axios from 'axios'
+import { getDeliveries } from '../api/webhooks.js'
 import { Dialog, Button, Badge, Loading, Empty } from './index.js'
 
 const props = defineProps({
@@ -120,7 +120,7 @@ const fetchDeliveries = async () => {
   if (!props.packageId) return
   
   try {
-    const res = await axios.get(`/api/webhooks/deliveries/${props.packageId}`)
+    const res = await getDeliveries(props.packageId)
     deliveries.value = res.data
     
     if (isPolling.value) {

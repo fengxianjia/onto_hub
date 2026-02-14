@@ -57,7 +57,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import axios from 'axios'
+import { getTemplates } from '../api/templates.js'
+import { createOntology } from '../api/ontologies.js'
 import { Button, Input, Select, Upload, Dialog } from './index.js'
 import { showMessage, message } from '../utils/message.js'
 
@@ -94,7 +95,7 @@ const handleFileChange = (files) => {
 
 const fetchTemplates = async () => {
   try {
-    const res = await axios.get('/api/templates/')
+    const res = await getTemplates()
     templates.value = res.data
   } catch (e) {
     console.error(e)
@@ -117,7 +118,7 @@ const submit = async () => {
   formData.append('auto_push', form.value.autoPush ? 'true' : 'false')
   
   try {
-    const res = await axios.post('/api/ontologies', formData)
+    const res = await createOntology(formData)
     showMessage(`上传成功: ${res.data.code} v${res.data.version}`, 'success')
     emit('success', res.data)
     visible.value = false

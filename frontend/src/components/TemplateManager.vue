@@ -382,7 +382,7 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
-import axios from 'axios'
+import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/templates.js'
 import { Button, Card, Empty, Loading, Badge, Dialog, Input, Select } from './index.js'
 import { showMessage, message, showConfirm } from '../utils/message.js'
 
@@ -442,7 +442,7 @@ const handleParserTypeChange = (newType) => {
   form.value.parser_type = newType
   
   let defaults = defaultRulesMarkdown
-  if (newType === 'owl') defaults = defaultRulesOWL
+  if (newType === 'owl') defaults = defaultRulesOwl
   if (newType === 'custom') {
     defaults = defaultRulesCustom
     configMode.value = 'json'
@@ -501,7 +501,7 @@ const syncJsonToVisual = () => {
 const fetchTemplates = async () => {
   loading.value = true
   try {
-    const res = await axios.get('/api/templates/')
+    const res = await getTemplates()
     templates.value = res.data
   } catch (error) {
     showMessage(message.getErrorMessage(error, '获取模板列表失败'), 'error')
@@ -554,10 +554,10 @@ const submitForm = async () => {
   try {
     const payload = { ...form.value }
     if (editingId.value) {
-      await axios.put(`/api/templates/${editingId.value}`, payload)
+      await updateTemplate(editingId.value, payload)
       showMessage('更新成功', 'success')
     } else {
-      await axios.post('/api/templates/', payload)
+      await createTemplate(payload)
       showMessage('创建成功', 'success')
     }
     dialogVisible.value = false
@@ -570,7 +570,7 @@ const submitForm = async () => {
 const handleDelete = async (template) => {
   try {
     await showConfirm(`确定要删除模板 "${template.name}" 吗？`, '删除请求')
-    await axios.delete(`/api/templates/${template.id}`)
+    await deleteTemplate(template.id)
     showMessage('删除成功', 'success')
     fetchTemplates()
   } catch (error) { if (error !== 'cancel') showMessage(message.getErrorMessage(error, '删除失败'), 'error') }

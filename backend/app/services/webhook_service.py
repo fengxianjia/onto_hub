@@ -122,32 +122,43 @@ class WebhookService:
             })
         return results
 
-    async def ping_webhook(self, webhook_id: str) -> ServiceResult[dict]:
-        webhook = self.repo.get_webhook(webhook_id)
-        if not webhook:
-            return ServiceResult.failure_result(
-                ServiceStatus.NOT_FOUND, 
-                "Webhook not found",
-                business_code=BusinessCode.WEBHOOK_NOT_FOUND
-            )
-            
+
+    async def test_connection(self, target_url: str = None, secret_token: Optional[str] = None, webhook_id: str = None) -> ServiceResult[dict]:
+        """
+        测试连通性。支持两种模式：
+        1. 提供 webhook_id: 测试已存在的 Webhook (从 DB 读取配置)。
+        2. 提供 target_url: 测试临时配置 (无需保存)。
+        """
+        # Mode 1: Resolve from ID
+        if webhook_id:
+            webhook = self.repo.get_webhook(webhook_id)
+            if not webhook:
+                return ServiceResult.failure_result(ServiceStatus.NOT_FOUND, "Webhook not found")
+            target_url = webhook.target_url
+            secret_token = webhook.secret_token
+        
+        # Validation
+        if not target_url:
+             return ServiceResult.failure_result(ServiceStatus.FAILURE, "Target URL is required when ID is not provided")
+
         payload = {
             "event": "ping",
-            "webhook_id": webhook.id,
-            "name": webhook.name,
+            "webhook_id": webhook_id or "test-connectivity",
+            "name": "Connectivity Test",
             "timestamp": utils.time.time() 
         }
         
         try:
             # 异步调用，且不记录日志
             result = await utils.send_webhook_request(
-                target_url=webhook.target_url,
+                target_url=target_url,
                 payload=payload,
-                webhook_id=webhook.id,
+                webhook_id=webhook_id or "test",
                 event_type="ping",
-                save_log=False,  # 不记录日志
-                secret_token=webhook.secret_token,
-                ontology_code="SYSTEM_PING"
+                save_log=False,
+                secret_token=secret_token,
+                ontology_code="SYSTEM_TEST",
+                max_retries=1 # 测试时不重试，快速反馈
             )
             return ServiceResult.success_result({
                 "status": result["status"],

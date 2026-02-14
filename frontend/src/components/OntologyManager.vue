@@ -93,9 +93,10 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import axios from 'axios'
+import { getOntologies } from '../api/ontologies.js'
 import { Button, Card, Badge, Empty, Loading, Pagination } from './index.js'
 import { formatDate } from '../utils/format.js'
+import { message, showMessage } from '../utils/message.js'
 
 const emit = defineEmits(['open-upload', 'view', 'history', 'subscription', 'delete'])
 
@@ -107,17 +108,13 @@ const pagination = reactive({
   total: 0
 })
 
-
-
 const fetchOntologies = async () => {
   loading.value = true
   try {
     const skip = (pagination.currentPage - 1) * pagination.pageSize
-    const res = await axios.get('/api/ontologies', {
-        params: {
-            skip,
-            limit: pagination.pageSize
-        }
+    const res = await getOntologies({
+        skip,
+        limit: pagination.pageSize
     })
     tableData.value = res.data.items
     pagination.total = res.data.total

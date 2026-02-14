@@ -5,6 +5,12 @@
       <div class="flex justify-between items-center py-2 px-1">
         <h3 class="text-lg font-bold text-foreground">订阅管理 (Webhooks)</h3>
         <div class="flex gap-3">
+          <Button variant="ghost" size="sm" @click="helpVisible = true" title="接入指南">
+            <svg class="h-5 w-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            接入指南
+          </Button>
           <Button variant="ghost" size="sm" @click="fetchWebhooks" title="刷新">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -181,7 +187,20 @@
         </div>
       </div>
       <template #footer>
-        <div class="flex justify-end gap-3">
+        <div class="flex justify-end gap-3 items-center w-full">
+          <div class="mr-auto">
+             <Button 
+              variant="ghost" 
+              size="sm"
+              @click="handleTest" 
+              :loading="testing"
+              :disabled="!form.target_url"
+              class="text-muted-foreground hover:text-foreground"
+            >
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              测试连通性
+            </Button>
+          </div>
           <Button variant="secondary" @click="dialogVisible = false">取消</Button>
           <Button variant="primary" @click="handleSubmit" :loading="submitting">确定</Button>
         </div>
@@ -201,14 +220,19 @@
       @refresh="fetchLogs"
       @page-change="fetchLogs"
     />
+
+    <!-- Help Dialog -->
+    <WebhookHelpDialog v-model="helpVisible" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, reactive, computed } from 'vue'
-import axios from 'axios'
+import { getWebhooks, createWebhook, updateWebhook, deleteWebhook, getWebhookLogs, testWebhook } from '../api/webhooks.js'
+import { getOntologies } from '../api/ontologies.js'
 import { Card, Button, Badge, Dialog, Input, Select, Loading, Empty, Pagination } from './index.js'
 import WebhookLogDrawer from './WebhookLogDrawer.vue'
+import WebhookHelpDialog from './WebhookHelpDialog.vue'
 import { message, showMessage, showConfirm } from '../utils/message.js'
 
 const emit = defineEmits(['change'])
@@ -216,7 +240,9 @@ const emit = defineEmits(['change'])
 const tableData = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
+const helpVisible = ref(false)
 const submitting = ref(false)
+const testing = ref(false)
 const isEdit = ref(false)
 const currentId = ref(null)
 
@@ -270,7 +296,7 @@ const ontologyFilterOptions = computed(() => {
 
 const fetchOntologyOptions = async () => {
   try {
-    const res = await axios.get('/api/ontologies?all_versions=false') // Ensure we get unique codes effectively by listing active/latest
+    const res = await getOntologies({ all_versions: false }) // Ensure we get unique codes effectively by listing active/latest
     // Map to Code + Name, ensure uniqueness by Code
     const uniqueMap = new Map()
     const items = res.data.items || []
@@ -293,11 +319,9 @@ const fetchWebhooks = async () => {
   loading.value = true
   try {
     const skip = (pagination.currentPage - 1) * pagination.pageSize
-    const res = await axios.get('/api/webhooks', {
-      params: {
-        skip,
-        limit: pagination.pageSize
-      }
+    const res = await getWebhooks({
+      skip,
+      limit: pagination.pageSize
     })
     // Backend now returns { items: [], total: int }
     tableData.value = res.data.items
@@ -348,7 +372,7 @@ const handleDelete = async (row) => {
   try {
     await showConfirm('确定要删除该订阅吗?', '警告')
     
-    await axios.delete(`/api/webhooks/${row.id}`)
+    await deleteWebhook(row.id)
     showMessage('删除成功', 'success')
     fetchWebhooks()
   } catch (error) {
@@ -387,7 +411,7 @@ const fetchLogs = async (filters = {}) => {
     params.skip = (logsPagination.currentPage - 1) * logsPagination.pageSize
     params.limit = logsPagination.pageSize
 
-    const res = await axios.get(`/api/webhooks/${currentWebhookId.value}/logs`, { params })
+    const res = await getWebhookLogs(currentWebhookId.value, params)
     logsData.value = res.data.items
     logsPagination.total = res.data.total
   } catch (e) {
@@ -400,7 +424,7 @@ const fetchLogs = async (filters = {}) => {
 const handlePing = async (row) => {
   showMessage('正在测试连通性...', 'info')
   try {
-    const res = await axios.post(`/api/webhooks/${row.id}/ping`)
+    const res = await testWebhook({ webhook_id: row.id })
     const { response_status } = res.data
     
     if (response_status) {
@@ -429,6 +453,39 @@ const handlePing = async (row) => {
   }
 }
 
+const handleTest = async () => {
+  if (!form.target_url) {
+    showMessage('请先填写回调地址', 'warning')
+    return
+  }
+  
+  testing.value = true
+  try {
+    const res = await testWebhook({
+      target_url: form.target_url,
+      secret_token: form.secret_token
+    })
+    
+    const { response_status } = res.data
+    
+    if (response_status) {
+      if (response_status >= 200 && response_status < 400) {
+        showMessage(`测试通过 (HTTP ${response_status})`, 'success')
+      } else if (response_status >= 400 && response_status < 500) {
+        showMessage(`目标服务响应异常 (HTTP ${response_status})`, 'warning')
+      } else {
+        showMessage(`测试失败 (HTTP ${response_status})`, 'error')
+      }
+    } else {
+      showMessage(`无法连接到目标服务 (无响应)`, 'error')
+    }
+  } catch (error) {
+    showMessage(message.getErrorMessage(error, '测试失败'), 'error')
+  } finally {
+    testing.value = false
+  }
+}
+
 const handleSubmit = async () => {
   if (!form.name || !form.target_url || !form.event_type) {
     showMessage('请填写必填项', 'warning')
@@ -438,10 +495,10 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     if (isEdit.value) {
-      await axios.put(`/api/webhooks/${currentId.value}`, form)
+      await updateWebhook(currentId.value, form)
       showMessage('更新成功', 'success')
     } else {
-      await axios.post('/api/webhooks', form)
+      await createWebhook(form)
       showMessage('创建成功', 'success')
     }
     dialogVisible.value = false

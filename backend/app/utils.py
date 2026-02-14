@@ -44,7 +44,8 @@ async def send_webhook_request(
     save_log: bool = True,
     secret_token: str = None,
     ontology_code: str = None,
-    db: Session = None
+    db: Session = None,
+    max_retries: int = 3
 ):
     """
     异步发送 Webhook 请求并记录日志 (支持重试、签名、优化日志)
@@ -52,7 +53,6 @@ async def send_webhook_request(
     status = "FAILURE"
     response_status = None
     error_message = None
-    max_retries = 3
     retry_delay = 1 # seconds
 
     # 1. 计算签名 (HMAC-SHA256)

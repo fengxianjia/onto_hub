@@ -155,7 +155,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import axios from 'axios'
+import { compareOntologies } from '../api/ontologies.js'
 import { CodeDiff } from 'v-code-diff'
 import { Dialog, Card, Badge, Button, Loading, Empty } from './index.js'
 import { showMessage } from '../utils/message.js'
@@ -226,11 +226,9 @@ const fetchVersionDiff = async () => {
   loadingDiff.value = true
   selectedFileDiff.value = null
   try {
-    const res = await axios.get(`/api/ontologies/compare`, {
-      params: {
-        base_id: props.oldVersion.id,
-        target_id: props.newVersion.id
-      }
+    const res = await compareOntologies({
+      base_id: props.oldVersion.id,
+      target_id: props.newVersion.id
     })
     fileDiff.value = res.data.files || []
     

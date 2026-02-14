@@ -57,7 +57,8 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import axios from 'axios'
+
+import { getOntologyRelations } from '../api/ontologies.js'
 import { Loading, Empty, Badge, Button } from './index.js'
 
 const props = defineProps({
@@ -76,9 +77,7 @@ const limit = ref(20)
 const fetchRelations = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`/api/ontologies/${props.ontologyId}/relations`, {
-        params: { skip: skip.value, limit: limit.value }
-    })
+    const res = await getOntologyRelations(props.ontologyId, { skip: skip.value, limit: limit.value })
     relations.value = res.data.items
     total.value = res.data.total
   } catch (e) {

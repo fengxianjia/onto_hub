@@ -181,7 +181,7 @@
 
 <script setup>
 import { ref, computed, watch, reactive } from 'vue'
-import axios from 'axios'
+import { getOntologyVersions, addOntologyVersion, activateOntology, deleteOntologyVersion } from '../api/ontologies.js'
 import { Drawer, Card, Badge, Button, Loading, Empty, Pagination } from './index.js'
 import DeliveryStatusDialog from './DeliveryStatusDialog.vue'
 import { message, showConfirm } from '../utils/message.js'
@@ -232,7 +232,7 @@ const handleFileUpload = async (e) => {
     formData.append('file', file)
     formData.append('auto_push', autoPush.value ? 'true' : 'false')
     
-    const res = await axios.post(`/api/ontologies/${props.ontologyCode}/versions`, formData)
+    const res = await addOntologyVersion(props.ontologyCode, formData)
     message.success(`版本 v${res.data.version} 上传成功`)
     
     // Refresh list
@@ -266,12 +266,13 @@ const handleActivate = async (version) => {
     // Set for dialog
     currentPackageId.value = version.id
 
-    await axios.post(`/api/ontologies/${version.id}/activate`)
+    await activateOntology(version.id)
     message.success(`版本 v${version.version} 已激活并触发推送`)
     
     // Show Progress
     deliveryDialogVisible.value = true
     
+    // Refresh list to update active status
     // Refresh list to update active status
     await fetchVersions()
     emit('refresh') // Notify parent to refresh main list if needed
@@ -280,6 +281,7 @@ const handleActivate = async (version) => {
       console.error(e)
       message.error(e.response?.data?.detail || '激活失败')
     }
+  } finally {
     activating.value = null
   }
 }
@@ -292,7 +294,7 @@ const handleDelete = async (version) => {
       { confirmButtonText: '确定删除', type: 'error' }
     )
 
-    await axios.delete(`/api/ontologies/${version.id}`)
+    await deleteOntologyVersion(version.id)
     message.success(`版本 v${version.version} 已删除`)
     
     await fetchVersions()
@@ -359,11 +361,9 @@ const fetchVersions = async () => {
   loading.value = true
   try {
     const skip = (pagination.currentPage - 1) * pagination.pageSize
-    const res = await axios.get(`/api/ontologies/${props.ontologyCode}/versions`, {
-      params: {
-        skip,
-        limit: pagination.pageSize
-      }
+    const res = await getOntologyVersions(props.ontologyCode, {
+      skip,
+      limit: pagination.pageSize
     })
     // Sort by version descending (backend already sorts by upload_time desc, but let's trust backend or ensure sort)
     // Backend `list_versions` calls `list_packages` which orders by `upload_time` desc.

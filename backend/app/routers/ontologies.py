@@ -208,6 +208,7 @@ def activate_ontology(
     payload = {
         "event": "ontology.activated",
         "package_id": package.id,
+        "code": package.code,
         "name": package.name,
         "version": package.version,
         "is_active": True,
